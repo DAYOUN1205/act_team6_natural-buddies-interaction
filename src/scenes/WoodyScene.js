@@ -414,66 +414,94 @@ if (greenStem?.isMesh) {
       this.defaultEnvironment;
   }
 
-  /**
-   * C4D에서 export된 RS Camera 사용
-   */
-  applyCamera(
-    targetCamera,
-    controls,
-  ) {
-    if (!this.sourceCamera) {
-      console.warn(
-        'Woody RS Camera를 찾지 못했습니다.',
-      );
-
-      return false;
-    }
-
-    this.root.updateMatrixWorld(true);
-
-    const scale =
-      new THREE.Vector3();
-
-    this.sourceCamera.matrixWorld.decompose(
-      targetCamera.position,
-      targetCamera.quaternion,
-      scale,
+  applyCamera(targetCamera, controls) {
+  if (!this.sourceCamera) {
+    console.warn(
+      'Woody RS Camera를 찾지 못했습니다.',
     );
 
-    if (
-      this.sourceCamera.isPerspectiveCamera
-    ) {
-      targetCamera.fov =
-        this.sourceCamera.fov;
-
-      targetCamera.near =
-        Math.max(
-          this.sourceCamera.near,
-          0.01,
-        );
-
-      targetCamera.far =
-        Math.min(
-          this.sourceCamera.far,
-          1000,
-        );
-
-      targetCamera.aspect =
-        window.innerWidth /
-        window.innerHeight;
-
-      targetCamera.updateProjectionMatrix();
-    }
-
-    /**
-     * 최종 전시에서는 카메라 고정
-     */
-    if (controls) {
-      controls.enabled = false;
-    }
-
-    return true;
+    return false;
   }
+
+  /**
+   * 중요:
+   * Fresh에서 사용하던 OrbitControls가
+   * Woody 카메라에 개입하지 못하도록
+   * 먼저 비활성화한다.
+   */
+  if (controls) {
+    controls.enabled = false;
+  }
+
+  /**
+   * GLB 내부 RS Camera의
+   * 정확한 world transform 계산
+   */
+  this.root.updateMatrixWorld(true);
+  this.sourceCamera.updateMatrixWorld(true);
+
+  const worldPosition =
+    new THREE.Vector3();
+
+  const worldQuaternion =
+    new THREE.Quaternion();
+
+  const worldScale =
+    new THREE.Vector3();
+
+  this.sourceCamera.matrixWorld.decompose(
+    worldPosition,
+    worldQuaternion,
+    worldScale,
+  );
+
+  /**
+   * 이전 Fresh 카메라 상태와 관계없이
+   * RS Camera 값으로 완전히 덮어쓴다.
+   */
+  targetCamera.position.copy(
+    worldPosition,
+  );
+
+  targetCamera.quaternion.copy(
+    worldQuaternion,
+  );
+
+  if (
+    this.sourceCamera.isPerspectiveCamera
+  ) {
+    targetCamera.fov =
+      this.sourceCamera.fov;
+
+    targetCamera.near =
+      Math.max(
+        this.sourceCamera.near,
+        0.01,
+      );
+
+    targetCamera.far =
+      Math.min(
+        this.sourceCamera.far,
+        1000,
+      );
+
+    targetCamera.zoom = 1;
+
+    targetCamera.aspect =
+      window.innerWidth /
+      window.innerHeight;
+
+    targetCamera.updateProjectionMatrix();
+  }
+
+  /**
+   * camera의 matrix도 즉시 갱신.
+   */
+  targetCamera.updateMatrix();
+  targetCamera.updateMatrixWorld(true);
+
+  return true;
+}
 
   /**
    * 센서 신호 / 키보드 입력 시 호출

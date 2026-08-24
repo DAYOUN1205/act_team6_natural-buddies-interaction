@@ -133,12 +133,14 @@ export class ThreeApp {
 
       update(deltaTime);
 
-      this.controls.update();
+      if (this.controls.enabled) {
+  this.controls.update();
+}
 
-      this.renderer.render(
-        this.scene,
-        this.camera,
-      );
+this.renderer.render(
+  this.scene,
+  this.camera,
+);
     });
   }
 }

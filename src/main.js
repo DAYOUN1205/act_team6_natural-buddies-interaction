@@ -5,14 +5,12 @@ import { SceneManager } from './core/SceneManager.js';
 
 import { FreshScene } from './scenes/FreshScene.js';
 import { FloralScene } from './scenes/FloralScene.js';
+import { WoodyScene } from './scenes/WoodyScene.js';
 
 import { connectKeyboardInput } from './input/keyboardInput.js';
 
-const canvas =
-  document.querySelector('#scene');
-
-const statusElement =
-  document.querySelector('#status');
+const canvas = document.querySelector('#scene');
+const statusElement = document.querySelector('#status');
 
 function setStatus(message) {
   if (!statusElement) return;
@@ -22,47 +20,38 @@ function setStatus(message) {
 }
 
 async function main() {
-  const app =
-    new ThreeApp(canvas);
+  const app = new ThreeApp(canvas);
 
-  const sceneManager =
-    new SceneManager(app);
+  const sceneManager = new SceneManager(app);
 
   /**
    * FRESH
    */
-  const freshScene =
-    new FreshScene(
-      app.scene,
-      {
-        modelUrl:
-          '/models/fresh/fresh_0729.gltf',
-
-        onStatus:
-          setStatus,
-      },
-    );
+  const freshScene = new FreshScene(app.scene, {
+    modelUrl: '/models/fresh/fresh_0729.gltf',
+    onStatus: setStatus,
+  });
 
   /**
    * FLORAL
    */
-  const floralScene =
-    new FloralScene(
-      app.scene,
-      {
-        modelUrl:
-          '/models/floral/floral.gltf',
-
-        backgroundUrl:
-          '/models/floral/background.exr',
-
-        onStatus:
-          setStatus,
-      },
-    );
+  const floralScene = new FloralScene(app.scene, {
+    modelUrl: '/models/floral/floral.gltf',
+    backgroundUrl: '/models/floral/background.exr',
+    onStatus: setStatus,
+  });
 
   /**
-   * SceneManager 등록
+   * WOODY
+   */
+  const woodyScene = new WoodyScene(app.scene, {
+    modelUrl: '/models/woody/woody.glb',
+    backgroundUrl: '/models/woody/woody_background.exr',
+    onStatus: setStatus,
+  });
+
+  /**
+   * 모든 향 Scene 등록
    */
   await sceneManager.add(
     'fresh',
@@ -74,37 +63,35 @@ async function main() {
     floralScene,
   );
 
-  /**
-   * 시작 화면
-   * 테스트 편의상 Fresh 표시
-   */
-  sceneManager.activate(
-    'fresh',
+  await sceneManager.add(
+    'woody',
+    woodyScene,
   );
+
+  /**
+   * 초기 화면
+   */
+  sceneManager.activate('fresh');
 
   /**
    * 공통 키보드 입력
    *
    * 1 = Fresh
    * 2 = Floral
+   * 3 = Woody
+   * 4 = Amber
    */
-  connectKeyboardInput(
-    sceneManager,
-  );
+  connectKeyboardInput(sceneManager);
 
   /**
    * 렌더 루프
    */
-  app.start(
-    (deltaTime) => {
-      sceneManager.update(
-        deltaTime,
-      );
-    },
-  );
+  app.start((deltaTime) => {
+    sceneManager.update(deltaTime);
+  });
 
   setStatus(
-    '1 = Fresh / 2 = Floral',
+    '1 = Fresh / 2 = Floral / 3 = Woody',
   );
 }
 
