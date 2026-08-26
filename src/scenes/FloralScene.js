@@ -12,7 +12,7 @@ export class FloralScene {
 
     this.modelUrl =
       options.modelUrl ??
-      '/models/floral/floral.gltf';
+      '/models/floral/0825FLOWER.glb';
 
     this.backgroundUrl =
       options.backgroundUrl ??
@@ -113,8 +113,10 @@ export class FloralScene {
     }
 
     this.findFlowers();
-    this.applyFlowerColors();
-    this.prepareFlowers();
+
+    this.applyClayMaterials();
+
+    this.prepareFlowers();  
 
     /**
      * EXR 배경
@@ -138,6 +140,7 @@ export class FloralScene {
   console.log(
     'Floral EXR 배경 로딩 완료',
   );
+
 } catch (error) {
   console.error(
     'Floral EXR 배경 로딩 실패:',
@@ -170,6 +173,35 @@ export class FloralScene {
       'Floral 모델 로딩 완료',
     );
   }
+  smoothMainFlowerGeometry() {
+  const meshes = [
+    ...this.flower1.petals,
+    ...this.flower1.center,
+    ...this.flower2.petals,
+    ...this.flower2.center,
+  ];
+
+  meshes.forEach((mesh) => {
+    if (!mesh.isMesh || !mesh.geometry) {
+      return;
+    }
+
+    let geometry = mesh.geometry.clone();
+
+    geometry.deleteAttribute('normal');
+    geometry.deleteAttribute('uv');
+
+    geometry = mergeVertices(
+      geometry,
+      1e-4,
+    );
+
+    geometry.computeVertexNormals();
+    geometry.normalizeNormals();
+
+    mesh.geometry = geometry;
+  });
+}
 
   /**
    * flower1 / flower2 찾기
@@ -293,41 +325,45 @@ export class FloralScene {
         ? object.material
         : [object.material];
 
-    const materialNames =
-      materials
-        .map(
-          (material) =>
-            material?.name ?? '',
-        )
-        .join(' ')
-        .toLowerCase();
+    const materialNames = materials
+      .map((material) =>
+        (material?.name ?? '').toLowerCase()
+      )
+      .join(' ');
 
     /**
-     * 현재 파일에서는
+     * 0825FLOWER.glb
      *
-     * Gold = 꽃잎
-     * Red = 중앙부
+     * flower1 petals  = Material.019
+     * flower1 center  = Material.023
+     *
+     * flower2 petals  = Material.013
+     * flower2 center  = Material.010
      */
-    if (
-      materialNames.includes('red')
-    ) {
-      flower.center.push(object);
 
+    const isCenter =
+      materialNames.includes('material.023') ||
+      materialNames.includes('material.010');
+
+    if (isCenter) {
+      flower.center.push(object);
       return;
     }
 
-    if (
-      materialNames.includes('gold')
-    ) {
-      flower.petals.push(object);
+    const isPetal =
+      materialNames.includes('material.019') ||
+      materialNames.includes('material.013');
 
+    if (isPetal) {
+      flower.petals.push(object);
       return;
     }
 
     /**
-     * 혹시 재질 이름이 나중에 바뀌어도
-     * 현재 모델 구조상 중앙부는
-     * Z scale이 0.58 정도이므로 fallback.
+     * 혹시 재질명이 다시 변경될 경우 fallback
+     *
+     * 현재 모델 중앙부는
+     * Z scale 약 0.58
      */
     if (object.scale.z < 0.8) {
       flower.center.push(object);
@@ -469,10 +505,10 @@ export class FloralScene {
       this.backgroundTexture;
 
     this.parentScene.backgroundIntensity =
-      0.35;
+      1.0; // 뒤에 보이는 EXR(배경?) 밝기
 
     this.parentScene.environmentIntensity =
-      0.45;
+      0.6; // EXR이 모델을 비추는 세기
   }
 }
 
@@ -480,66 +516,49 @@ export class FloralScene {
    * glTF에 들어 있는
    * RS Camera를 실제 렌더 카메라에 복사
    */
-  applyCamera(
-    targetCamera,
-    controls,
-  ) {
+  applyCamera(targetCamera, controls) {
+  if (!this.root) {
     return false;
-
-    this.root.updateMatrixWorld(true);
-
-    const scale =
-      new THREE.Vector3();
-
-    this.sourceCamera
-      .matrixWorld
-      .decompose(
-        targetCamera.position,
-        targetCamera.quaternion,
-        scale,
-      );
-
-    if (
-      this.sourceCamera.isPerspectiveCamera
-    ) {
-      targetCamera.fov =
-        this.sourceCamera.fov;
-
-      targetCamera.near =
-        this.sourceCamera.near;
-
-      /**
-       * 원본 카메라 far가
-       * 지나치게 크므로
-       * WebGL에서는 적당히 제한.
-       */
-      targetCamera.far =
-        Math.min(
-          this.sourceCamera.far,
-          1000,
-        );
-
-      /**
-       * 실제 브라우저 비율 사용
-       */
-      targetCamera.aspect =
-        window.innerWidth /
-        window.innerHeight;
-
-      targetCamera
-        .updateProjectionMatrix();
-    }
-
-    /**
-     * OrbitControls가 카메라 방향을
-     * 다시 바꾸지 못하게 함.
-     */
-    if (controls) {
-      controls.enabled = false;
-    }
-
-    return true;
   }
+
+  targetCamera.position.set(
+    0.6021225779128823,
+    1.918462110789069,
+    2.5484613407312144,
+  );
+
+  targetCamera.quaternion.set(
+    -0.05697375343231073,
+    0.10785548454364136,
+    0.006191283430572616,
+    0.9925134023695463,
+  );
+
+  targetCamera.fov = 32;
+  targetCamera.near = 0.01;
+  targetCamera.far = 1000;
+  targetCamera.zoom = 1;
+
+  targetCamera.aspect =
+    window.innerWidth / window.innerHeight;
+
+  targetCamera.updateProjectionMatrix();
+  targetCamera.updateMatrix();
+  targetCamera.updateMatrixWorld(true);
+
+  if (controls) {
+    controls.target.set(
+      0.10149076075744884,
+      1.649999999999999,
+      0.2721927360005072,
+    );
+
+    controls.enabled = false;
+    controls.update();
+  }
+
+  return true;
+}
 
   /**
    * 2번 키 / Floral 센서
@@ -754,4 +773,99 @@ export class FloralScene {
         )
     );
   }
+  applyClayMaterials() {
+  const targetMaterials = new Set([
+    'Material.013', // 꽃잎
+    'Material.019', // 꽃잎
+    'Material.010', // 중앙
+    'Material.023', // 중앙
+  ]);
+
+  this.root.traverse((object) => {
+    if (!object.isMesh || !object.material) {
+      return;
+    }
+
+    const materials =
+      Array.isArray(object.material)
+        ? object.material
+        : [object.material];
+
+    const converted =
+      materials.map((material) => {
+        if (!targetMaterials.has(material.name)) {
+          return material;
+        }
+
+        const clay =
+          new THREE.MeshPhysicalMaterial({
+            name: `${material.name}_Clay`,
+
+            // GLB의 원래 색 그대로
+            color: material.color.clone(),
+
+            // 꽃/클레이는 비금속
+            metalness: 0,
+
+            /**
+             * 너무 높이면 분필처럼 되고
+             * 너무 낮으면 플라스틱처럼 됨.
+             *
+             * 레퍼런스는 satin clay 쪽.
+             */
+            roughness: 0.55,
+
+            /**
+             * 부드러운 흰색 highlight
+             */
+            specularIntensity: 0.45,
+            specularColor: new THREE.Color(
+              0xffffff,
+            ),
+
+            ior: 1.45,
+
+            /**
+             * 클레이에는 코팅층이 필요 없음.
+             * 오히려 clearcoat가 들어가면
+             * 플라스틱/도자기 느낌이 강해짐.
+             */
+            clearcoat: 0,
+
+            /**
+             * sheen은 원래 천/섬유 표현용 성격이
+             * 강하므로 일단 사용하지 않음.
+             */
+            sheen: 0,
+
+            envMapIntensity: 0.5,
+
+            side: material.side,
+
+            transparent:
+              material.transparent,
+
+            opacity:
+              material.opacity,
+
+            depthWrite:
+              material.depthWrite,
+
+            depthTest:
+              material.depthTest,
+          });
+
+        clay.flatShading = false;
+
+        clay.needsUpdate = true;
+
+        return clay;
+      });
+
+    object.material =
+      Array.isArray(object.material)
+        ? converted
+        : converted[0];
+  });
+}
 }
