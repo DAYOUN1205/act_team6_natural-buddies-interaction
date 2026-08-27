@@ -6,6 +6,7 @@ import { SceneManager } from './core/SceneManager.js';
 import { FreshScene } from './scenes/FreshScene.js';
 import { FloralScene } from './scenes/FloralScene.js';
 import { WoodyScene } from './scenes/WoodyScene.js';
+import { AmberScene } from './scenes/AmberScene.js';
 
 import { connectKeyboardInput } from './input/keyboardInput.js';
 
@@ -51,6 +52,21 @@ async function main() {
   });
 
   /**
+   * Amber
+   */
+  const amberScene =
+  new AmberScene(
+    app.scene,
+    {
+      modelUrl:
+        '/models/amber/amber.gltf',
+
+      onStatus:
+        setStatus,
+    },
+  );
+
+  /**
    * 모든 향 Scene 등록
    */
   await sceneManager.add(
@@ -67,6 +83,11 @@ async function main() {
     'woody',
     woodyScene,
   );
+
+  await sceneManager.add(
+  'amber',
+  amberScene,
+);
 
   /**
    * 초기 화면
@@ -91,7 +112,7 @@ async function main() {
   });
 
   setStatus(
-    '1 = Fresh / 2 = Floral / 3 = Woody',
+    '1 = Fresh / 2 = Floral / 3 = Woody / 4 = Amber',
   );
 }
 
