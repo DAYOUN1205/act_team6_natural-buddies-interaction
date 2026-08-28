@@ -9,6 +9,7 @@ import { WoodyScene } from './scenes/WoodyScene.js';
 import { AmberScene } from './scenes/AmberScene.js';
 
 import { connectKeyboardInput } from './input/keyboardInput.js';
+import {  connectSerialInput, } from './input/serialInput.js';
 
 const canvas = document.querySelector('#scene');
 const statusElement = document.querySelector('#status');
@@ -103,6 +104,38 @@ async function main() {
    * 4 = Amber
    */
   connectKeyboardInput(sceneManager);
+
+  const connectSensorButton =
+  document.querySelector(
+    '#connect-sensor',
+  );
+
+connectSensorButton
+  ?.addEventListener(
+    'click',
+    async () => {
+      try {
+        await connectSerialInput(
+          sceneManager,
+          {
+            onStatus: setStatus,
+          },
+        );
+
+        connectSensorButton.style.display =
+          'none';
+      } catch (error) {
+        console.error(
+          '센서 연결 실패:',
+          error,
+        );
+
+        setStatus(
+          '센서 연결 실패',
+        );
+      }
+    },
+  );
 
   /**
    * 렌더 루프
