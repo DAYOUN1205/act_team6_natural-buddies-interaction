@@ -11,6 +11,12 @@ export function connectKeyboardInput(sceneManager) {
 
     if (!sceneName) return;
 
+    console.time('scene-switch');
+
+    sceneManager.trigger(sceneName);
+
+    console.timeEnd('scene-switch');
+
     console.log(
       `${event.key} → ${sceneName.toUpperCase()}`,
     );
