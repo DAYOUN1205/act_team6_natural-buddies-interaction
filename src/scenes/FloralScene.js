@@ -6,6 +6,9 @@ import { GLTFLoader } from
 import { EXRLoader } from
   'three/addons/loaders/EXRLoader.js';
 
+import { RectAreaLightUniformsLib } from
+  'three/addons/lights/RectAreaLightUniformsLib.js';
+
 export class FloralScene {
   constructor(parentScene, options = {}) {
     this.parentScene = parentScene;
@@ -43,7 +46,7 @@ export class FloralScene {
     /**
      * 꽃 하나가 피는 기본 시간
      */
-    this.bloomDuration = 1.0;
+    this.bloomDuration = 0.4;
 
     /**
      * flower1 시작 후
@@ -52,25 +55,36 @@ export class FloralScene {
      * 디자이너 요청:
      * 약 1초 텀
      */
-    this.flower2Delay = 1.0;
+    this.flower2Delay = 1.1;
 
     /**
      * 한 꽃 안에서도
      * 꽃잎이 완벽하게 동시에 움직이지 않고
      * 살짝 시간차를 줌
      */
-    this.petalDelay = 0.025;
+    this.petalDelay = 0.1;
 
     /**
      * 닫혀 있을 때 꽃잎 크기
      */
-    this.closedScale = 0.65;
+    this.closedScale = 0.1;
 
     /**
      * 꽃잎이 접혀 있는 정도
      */
     this.closedAngle =
       THREE.MathUtils.degToRad(68);
+
+    this.closedAngle =
+      THREE.MathUtils.degToRad(68);
+
+    // Floral 전용 조명
+    this.floralLightGroup = new THREE.Group();
+
+    this.overallLight = null;
+    this.keyAreaLight = null;
+    this.backLight = null;
+    this.frontLeftLight = null;
   }
 
   /**
@@ -92,12 +106,14 @@ export class FloralScene {
 
     this.root.traverse((object) => {
       if (object.isMesh) {
-        object.castShadow = true;
-        object.receiveShadow = true;
+        object.castShadow = false;
+        object.receiveShadow = false;
       }
     });
 
     this.parentScene.add(this.root);
+
+    this.setupLights();
 
     /**
      * 디자이너가 넣어둔 카메라
@@ -114,40 +130,68 @@ export class FloralScene {
 
     this.findFlowers();
 
-    this.applyClayMaterials();
-
-    this.prepareFlowers();  
-
-    /**
-     * EXR 배경
-     */
-    try {
-  const exrLoader =
-    new EXRLoader();
-
-  exrLoader.setDataType(
-    THREE.FloatType,
-  );
-
-  this.backgroundTexture =
-    await exrLoader.loadAsync(
-      this.backgroundUrl,
+    // flower1 = 오른쪽 꽃 → 시계방향
+    this.sortFlowerPetals(
+      this.flower1,
+      'clockwise',
     );
 
-  this.backgroundTexture.mapping =
-    THREE.EquirectangularReflectionMapping;
+    // flower2 = 왼쪽 꽃 → 반시계방향
+    this.sortFlowerPetals(
+      this.flower2,
+      'counterclockwise',
+    );
 
-  console.log(
-    'Floral EXR 배경 로딩 완료',
-  );
+    this.inspectMainFlowers();
+    this.prepareFlowers(); 
 
-} catch (error) {
-  console.error(
-    'Floral EXR 배경 로딩 실패:',
-    error,
-  );
-}
-    this.reset();
+    /**
+     * 배경
+     */
+    try {
+    const textureLoader =
+      new THREE.TextureLoader();
+
+    this.backgroundTexture =
+      await textureLoader.loadAsync(
+        this.backgroundUrl,
+      );
+
+    this.backgroundTexture.colorSpace =
+      THREE.SRGBColorSpace;
+
+    // 배경 중앙 기준 확대
+    this.backgroundTexture.center.set(0.5, 0.5);
+
+    // 1보다 작을수록 확대됨
+    this.backgroundTexture.repeat.set(
+      0.35,
+      0.35,
+    );
+
+    // 배경 위치 조정
+    this.backgroundTexture.offset.set(
+      0.1, // 좌우
+      -0.05,    // 상하
+    );
+
+    this.backgroundTexture.updateMatrix();
+
+    this.backgroundTexture.needsUpdate = true;
+
+    console.log(
+      'Floral PNG 배경 로딩 완료:',
+      this.backgroundUrl,
+      this.backgroundTexture.image?.width,
+      this.backgroundTexture.image?.height,
+    );
+  } catch (error) {
+    console.error(
+      'Floral PNG 배경 로딩 실패:',
+      error,
+    );
+  }
+        this.reset();
 
     console.log(
       'flower1 꽃잎:',
@@ -173,6 +217,98 @@ export class FloralScene {
       'Floral 모델 로딩 완료',
     );
   }
+
+  setupLights() {
+  RectAreaLightUniformsLib.init();
+
+  // 조명들을 한 그룹으로 관리
+  this.parentScene.add(
+    this.floralLightGroup,
+  );
+
+  // 1. 전체 조명
+  this.overallLight =
+    new THREE.HemisphereLight(
+      0xffffff,
+      0x444444,
+      0.5,
+    );
+
+  this.floralLightGroup.add(
+    this.overallLight,
+  );
+
+  // 2. 왼쪽 위 메인 Area Light
+  this.keyAreaLight =
+    new THREE.RectAreaLight(
+      0xffffff,
+      8,
+      3,
+      3,
+    );
+
+  this.keyAreaLight.position.set(
+    -2,
+    3,
+    2,
+  );
+
+  this.keyAreaLight.lookAt(
+    0,
+    1,
+    0,
+  );
+
+  this.floralLightGroup.add(
+    this.keyAreaLight,
+  );
+
+  // 3. 뒤쪽 보조 조명
+  this.backLight =
+    new THREE.DirectionalLight(
+      0xffffff,
+      0.6,
+    );
+
+  this.backLight.position.set(
+    2,
+    2,
+    -2,
+  );
+
+  this.floralLightGroup.add(
+    this.backLight,
+  );
+
+  // 4. 사용자 기준 왼쪽 앞 → 꽃 방향 대각선 조명
+  this.frontLeftLight =
+    new THREE.RectAreaLight(
+      0xffffff,
+      4,   // 밝기
+      2.5, // 가로 크기
+      2.5, // 세로 크기
+    );
+
+  this.frontLeftLight.position.set(
+    -2.2, // 사용자 기준 왼쪽
+    2.4,  // 약간 위
+    3.0,  // 사용자/카메라 쪽
+  );
+
+  // 두 꽃 사이 정도를 향하게
+  this.frontLeftLight.lookAt(
+    -0.1,
+    1.5,
+    0.2,
+  );
+
+  this.floralLightGroup.add(
+    this.frontLeftLight,
+  );
+
+  this.floralLightGroup.visible = false;
+}
+
   smoothMainFlowerGeometry() {
   const meshes = [
     ...this.flower1.petals,
@@ -188,7 +324,6 @@ export class FloralScene {
 
     let geometry = mesh.geometry.clone();
 
-    geometry.deleteAttribute('normal');
     geometry.deleteAttribute('uv');
 
     geometry = mergeVertices(
@@ -196,7 +331,6 @@ export class FloralScene {
       1e-4,
     );
 
-    geometry.computeVertexNormals();
     geometry.normalizeNormals();
 
     mesh.geometry = geometry;
@@ -251,6 +385,139 @@ export class FloralScene {
       }
     });
   }
+
+  sortFlowerPetals(
+    flower,
+    direction = 'clockwise',
+  ) {
+  if (
+    flower.petals.length === 0 ||
+    flower.center.length === 0
+  ) {
+    return;
+  }
+
+  // 꽃 중앙의 실제 화면상 위치 계산
+  const centerBox = new THREE.Box3();
+
+  flower.center.forEach((mesh) => {
+    centerBox.expandByObject(mesh);
+  });
+
+  const center = new THREE.Vector3();
+  centerBox.getCenter(center);
+
+  flower.petals.sort((a, b) => {
+    const boxA = new THREE.Box3()
+      .setFromObject(a);
+
+    const boxB = new THREE.Box3()
+      .setFromObject(b);
+
+    const posA = new THREE.Vector3();
+    const posB = new THREE.Vector3();
+
+    boxA.getCenter(posA);
+    boxB.getCenter(posB);
+
+    const dxA = posA.x - center.x;
+    const dyA = posA.y - center.y;
+
+    const dxB = posB.x - center.x;
+    const dyB = posB.y - center.y;
+
+    // 위쪽 꽃잎을 0번으로 해서 시계방향
+    let angleA = Math.atan2(dxA, dyA);
+    let angleB = Math.atan2(dxB, dyB);
+
+    if (angleA < 0) {
+      angleA += Math.PI * 2;
+    }
+
+    if (angleB < 0) {
+      angleB += Math.PI * 2;
+    }
+
+    if (direction === 'counterclockwise') {
+      return angleB - angleA;
+    }
+
+    return angleA - angleB;
+  });
+}
+
+  inspectMainFlowers() {
+  const meshes = [
+    ...this.flower1.petals,
+    ...this.flower1.center,
+    ...this.flower2.petals,
+    ...this.flower2.center,
+  ];
+
+  const checkedMaterials = new Set();
+
+  meshes.forEach((mesh) => {
+    console.log(
+      'MESH',
+      mesh.name,
+      'vertices:',
+      mesh.geometry?.attributes?.position?.count,
+      'triangles:',
+      mesh.geometry?.index
+        ? mesh.geometry.index.count / 3
+        : mesh.geometry?.attributes?.position?.count / 3,
+    );
+
+    const materials = Array.isArray(mesh.material)
+      ? mesh.material
+      : [mesh.material];
+
+    materials.forEach((material) => {
+      if (!material || checkedMaterials.has(material.uuid)) {
+        return;
+      }
+
+      checkedMaterials.add(material.uuid);
+
+      console.log('MATERIAL', material.name, {
+        type: material.type,
+
+        color:
+          material.color?.getHexString(),
+
+        metalness:
+          material.metalness,
+
+        roughness:
+          material.roughness,
+
+        map:
+          !!material.map,
+
+        normalMap:
+          !!material.normalMap,
+
+        roughnessMap:
+          !!material.roughnessMap,
+
+        metalnessMap:
+          !!material.metalnessMap,
+
+        aoMap:
+          !!material.aoMap,
+
+        alphaMap:
+          !!material.alphaMap,
+
+        bumpMap:
+          !!material.bumpMap,
+
+        displacementMap:
+          !!material.displacementMap,
+      });
+    });
+  });
+}
 
   applyFlowerColors() {
   /**
@@ -494,27 +761,32 @@ export class FloralScene {
   }
 
   /**
-   * 이 장면이 선택될 때
-   */
-  onActivate() {
+ * Floral 장면 활성화
+ */
+onActivate() {
   if (this.backgroundTexture) {
     this.parentScene.background =
       this.backgroundTexture;
 
-    this.parentScene.environment =
-      this.backgroundTexture;
-
     this.parentScene.backgroundIntensity =
-      1.0; // 뒤에 보이는 EXR(배경?) 밝기
+      1.0;
 
-    this.parentScene.environmentIntensity =
-      0.6; // EXR이 모델을 비추는 세기
+    this.parentScene.backgroundBlurriness =
+      0;
+  }
+
+  // PNG는 환경광으로 사용하지 않음
+  this.parentScene.environment = null;
+
+  // Floral 전용 조명 켜기
+  if (this.floralLightGroup) {
+    this.floralLightGroup.visible = true;
   }
 }
 
+
   /**
-   * glTF에 들어 있는
-   * RS Camera를 실제 렌더 카메라에 복사
+   * 이 장면이 선택될 때
    */
   applyCamera(targetCamera, controls) {
   if (!this.root) {
@@ -522,16 +794,16 @@ export class FloralScene {
   }
 
   targetCamera.position.set(
-    0.6021225779128823,
-    1.918462110789069,
-    2.5484613407312144,
+    -0.19334259473510773,
+    1.6398067400883434,
+    2.416746742192816,
   );
 
   targetCamera.quaternion.set(
-    -0.05697375343231073,
-    0.10785548454364136,
-    0.006191283430572616,
-    0.9925134023695463,
+    0.002325062799254863,
+    0.016575382515515116,
+    -0.00003854420474156451,
+    0.9998599148339672,
   );
 
   targetCamera.fov = 32;
@@ -548,13 +820,12 @@ export class FloralScene {
 
   if (controls) {
     controls.target.set(
-      0.10149076075744884,
-      1.649999999999999,
-      0.2721927360005072,
+      -0.26599002975954306,
+      1.6499999999999995,
+      0.2262302960226761,
     );
 
     controls.enabled = false;
-    controls.update();
   }
 
   return true;
@@ -599,7 +870,7 @@ export class FloralScene {
      * 0초부터 시작
      */
     this.updateFlower(
-      this.flower1,
+      this.flower2,
       this.elapsedTime,
     );
 
@@ -609,24 +880,23 @@ export class FloralScene {
      * 1초 뒤 시작
      */
     this.updateFlower(
-      this.flower2,
+      this.flower1,
       this.elapsedTime -
         this.flower2Delay,
     );
 
-    const flower2TotalDuration =
+    const totalDuration =
       this.flower2Delay +
       this.bloomDuration +
       this.petalDelay *
         Math.max(
-          this.flower2.petals.length -
-            1,
+          this.flower1.petals.length - 1,
           0,
         );
 
     if (
       this.elapsedTime >=
-      flower2TotalDuration
+      totalDuration
     ) {
       this.state = 'open';
 
