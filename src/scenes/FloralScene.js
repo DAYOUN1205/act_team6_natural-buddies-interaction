@@ -92,8 +92,8 @@ export class FloralScene {
 
     this.root.traverse((object) => {
       if (object.isMesh) {
-        object.castShadow = true;
-        object.receiveShadow = true;
+        object.castShadow = false;
+        object.receiveShadow = false;
       }
     });
 
@@ -113,9 +113,7 @@ export class FloralScene {
     }
 
     this.findFlowers();
-
-    this.applyClayMaterials();
-
+    this.inspectMainFlowers();
     this.prepareFlowers();  
 
     /**
@@ -188,7 +186,6 @@ export class FloralScene {
 
     let geometry = mesh.geometry.clone();
 
-    geometry.deleteAttribute('normal');
     geometry.deleteAttribute('uv');
 
     geometry = mergeVertices(
@@ -196,7 +193,6 @@ export class FloralScene {
       1e-4,
     );
 
-    geometry.computeVertexNormals();
     geometry.normalizeNormals();
 
     mesh.geometry = geometry;
@@ -251,6 +247,79 @@ export class FloralScene {
       }
     });
   }
+
+  inspectMainFlowers() {
+  const meshes = [
+    ...this.flower1.petals,
+    ...this.flower1.center,
+    ...this.flower2.petals,
+    ...this.flower2.center,
+  ];
+
+  const checkedMaterials = new Set();
+
+  meshes.forEach((mesh) => {
+    console.log(
+      'MESH',
+      mesh.name,
+      'vertices:',
+      mesh.geometry?.attributes?.position?.count,
+      'triangles:',
+      mesh.geometry?.index
+        ? mesh.geometry.index.count / 3
+        : mesh.geometry?.attributes?.position?.count / 3,
+    );
+
+    const materials = Array.isArray(mesh.material)
+      ? mesh.material
+      : [mesh.material];
+
+    materials.forEach((material) => {
+      if (!material || checkedMaterials.has(material.uuid)) {
+        return;
+      }
+
+      checkedMaterials.add(material.uuid);
+
+      console.log('MATERIAL', material.name, {
+        type: material.type,
+
+        color:
+          material.color?.getHexString(),
+
+        metalness:
+          material.metalness,
+
+        roughness:
+          material.roughness,
+
+        map:
+          !!material.map,
+
+        normalMap:
+          !!material.normalMap,
+
+        roughnessMap:
+          !!material.roughnessMap,
+
+        metalnessMap:
+          !!material.metalnessMap,
+
+        aoMap:
+          !!material.aoMap,
+
+        alphaMap:
+          !!material.alphaMap,
+
+        bumpMap:
+          !!material.bumpMap,
+
+        displacementMap:
+          !!material.displacementMap,
+      });
+    });
+  });
+}
 
   applyFlowerColors() {
   /**

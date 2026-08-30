@@ -20,7 +20,7 @@ async function main() {
   const sceneManager = new SceneManager(app);
 
   const floralScene = new FloralScene(app.scene, {
-    modelUrl: '/models/floral/0825FLOWER.glb',
+    modelUrl: '/models/floral/0830_flower.glb',
     backgroundUrl: '/models/floral/background.exr',
     onStatus: setStatus,
   });
