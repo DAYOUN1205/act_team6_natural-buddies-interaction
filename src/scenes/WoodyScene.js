@@ -78,7 +78,7 @@ export class WoodyScene {
     this.characterMoveElapsed = 0;
 
     // 앞으로 걸어오는 시간
-    this.characterMoveDuration = 1.5;
+    this.characterMoveDuration = 3;
 
     // Woody 기준 이동 거리
     // 카메라 쪽이 +Z 방향이므로 +Z로 이동
@@ -86,7 +86,7 @@ export class WoodyScene {
       new THREE.Vector3(
         0,
         0,
-        0.01,
+        0.015,
       );
 
     /**
@@ -805,7 +805,7 @@ this.root.traverse((object) => {
       this.characterEndPosition.set(
         0.002,
         -0.0045,
-        -0.001,
+        0.005,
       );
 
       /**
@@ -844,6 +844,9 @@ this.root.traverse((object) => {
           this.characterMixer.clipAction(
             clip,
           );
+
+        // 걷기 애니메이션 속도
+        this.characterAction.timeScale = 0.5;
 
         this.characterAction.setLoop(
           THREE.LoopRepeat,
