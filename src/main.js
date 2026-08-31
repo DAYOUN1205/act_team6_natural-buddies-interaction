@@ -26,14 +26,6 @@ async function main() {
   const sceneManager = new SceneManager(app);
 
   /**
-   * FRESH
-   */
-  const freshScene = new FreshScene(app.scene, {
-    modelUrl: '/models/fresh/fresh_0729.gltf',
-    onStatus: setStatus,
-  });
-
-  /**
    * FLORAL
    */
   const floralScene = new FloralScene(app.scene, {
@@ -46,34 +38,16 @@ async function main() {
    * WOODY
    */
   const woodyScene = new WoodyScene(app.scene, {
-    modelUrl: '/models/woody/0830_woody.glb',
+    modelUrl: '/models/woody/0831_woody.glb',
     backgroundUrl: '/models/woody/woody_background_2.png',
     onStatus: setStatus,
   });
 
-  /**
-   * Amber
-   */
-  const amberScene =
-  new AmberScene(
-    app.scene,
-    {
-      modelUrl:
-        '/models/amber/amber.gltf',
-
-      onStatus:
-        setStatus,
-    },
-  );
-
+  
   /**
    * 모든 향 Scene 등록
    */
-  await sceneManager.add(
-    'fresh',
-    freshScene,
-  );
-
+  
   await sceneManager.add(
     'floral',
     floralScene,
@@ -84,10 +58,6 @@ async function main() {
     woodyScene,
   );
 
-  await sceneManager.add(
-  'amber',
-  amberScene,
-);
 
   /**
    * 초기 화면
