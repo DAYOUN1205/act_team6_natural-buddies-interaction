@@ -13,7 +13,7 @@ export class FloralScene {
   constructor(parentScene, options = {}) {
     this.characterUrl =
       options.characterUrl ??
-      '/models/floral/floral_character.glb';
+      '/models/floral/floral_character_final.glb';
 
     this.characterWrapper = null;
     this.characterRoot = null;
@@ -56,7 +56,7 @@ export class FloralScene {
     /**
      * 꽃 하나가 피는 기본 시간
      */
-    this.bloomDuration = 0.4;
+    this.bloomDuration = 1.4;
 
     /**
      * flower1 시작 후
@@ -213,13 +213,13 @@ export class FloralScene {
        * 네가 표시한 원 위치 기준으로 잡은 시작값
        */
       this.characterWrapper.position.set(
-        -0.29,  // 좌우
-        1.18,   // 높이
-        -0.20,  // 앞뒤
+        -0.19,  // 좌우
+        1.23,   // 높이
+        0.60,  // 앞뒤
       );
 
       this.characterWrapper.scale.setScalar(
-        0.03,
+        0.12,
       );
 
       /**
