@@ -38,7 +38,7 @@ async function main() {
    * WOODY
    */
   const woodyScene = new WoodyScene(app.scene, {
-    modelUrl: '/models/woody/0831_woody.glb',
+    modelUrl: '/models/woody/0831_woody_2.glb',
     backgroundUrl: '/models/woody/woody_background_2.png',
     onStatus: setStatus,
   });
