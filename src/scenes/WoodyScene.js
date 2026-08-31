@@ -46,6 +46,39 @@ export class WoodyScene {
     this.bugTwoFlightDuration = 10;
 
     /**
+     * Woody 캐릭터
+     */
+    this.characterUrl =
+      options.characterUrl ??
+      '/models/woody/woody_character.glb';
+
+    this.characterWrapper = null;
+    this.characterRoot = null;
+
+    this.characterMixer = null;
+    this.characterAction = null;
+
+    this.characterStartPosition =
+      new THREE.Vector3();
+
+    this.characterEndPosition =
+      new THREE.Vector3();
+
+    this.characterMoveElapsed = 0;
+
+    // 앞으로 걸어오는 시간
+    this.characterMoveDuration = 1.5;
+
+    // Woody 기준 이동 거리
+    // 카메라 쪽이 +Z 방향이므로 +Z로 이동
+    this.characterMoveOffset =
+      new THREE.Vector3(
+        0,
+        0,
+        0.01,
+      );
+
+    /**
      * 카메라
      */
     this.sourceCamera = null;
@@ -297,6 +330,8 @@ this.root.traverse((object) => {
       this.motionScale,
     );
 
+    await this.loadCharacter(loader);
+
     /**
      * 5. EXR 배경
      */
@@ -522,6 +557,30 @@ this.root.traverse((object) => {
     this.isRunning = true;
 
     /**
+     * 캐릭터 초기화
+     */
+    this.characterMoveElapsed = 0;
+
+    if (this.characterWrapper) {
+      this.characterWrapper.position.copy(
+        this.characterStartPosition,
+      );
+    }
+
+    /**
+     * 걷기 애니메이션 시작
+     */
+    if (this.characterAction) {
+      this.characterAction
+        .reset()
+        .setLoop(
+          THREE.LoopRepeat,
+          Infinity,
+        )
+        .play();
+    }
+
+    /**
      * 디자이너의 4초짜리 애니메이션 시작
      */
     if (this.animationAction) {
@@ -593,6 +652,51 @@ this.root.traverse((object) => {
     }
 
     /**
+     * 캐릭터 걷기 animation은
+     * 계속 반복
+     */
+    if (this.characterMixer) {
+      this.characterMixer.update(
+        deltaTime,
+      );
+    }
+
+
+    /**
+     * 캐릭터 위치 이동은
+     * 처음 4.5초 동안만
+     */
+    if (
+      this.characterWrapper &&
+      this.characterMoveElapsed <
+        this.characterMoveDuration
+    ) {
+      this.characterMoveElapsed +=
+        deltaTime;
+
+      const t =
+        Math.min(
+          this.characterMoveElapsed /
+            this.characterMoveDuration,
+          1,
+        );
+
+      /**
+       * 처음/끝에서 너무 갑자기
+       * 출발하거나 멈추지 않도록
+       * 부드럽게 보간
+       */
+      const smoothT =
+        t * t * (3 - 2 * t);
+
+      this.characterWrapper.position.lerpVectors(
+        this.characterStartPosition,
+        this.characterEndPosition,
+        smoothT,
+      );
+    }
+
+    /**
      * 우리가 코드로 만드는 반딧불 모션
      */
     this.updateBugOne(
@@ -604,6 +708,207 @@ this.root.traverse((object) => {
     );
   }
 
+  async loadCharacter(loader) {
+    try {
+      const gltf =
+        await loader.loadAsync(
+          this.characterUrl,
+        );
+
+      this.characterRoot =
+        gltf.scene;
+
+      /**
+       * 캐릭터 전체를 움직이기 위한 Wrapper.
+       *
+       * Armature animation은 characterRoot에서,
+       * 실제 앞으로 이동은 Wrapper에서 처리한다.
+       */
+      this.characterWrapper =
+        new THREE.Group();
+
+      this.characterWrapper.add(
+        this.characterRoot,
+      );
+
+      this.root.add(
+        this.characterWrapper,
+      );
+
+
+      /**
+       * 캐릭터 크기
+       */
+      this.characterWrapper.scale.setScalar(
+        0.0055,
+      );
+
+
+      /**
+       * 모델의 가장 아래 지점을
+       * Wrapper의 Y=0으로 맞춤.
+       */
+      const box =
+        new THREE.Box3().setFromObject(
+          this.characterRoot,
+        );
+
+      this.characterRoot.position.y -=
+        box.min.y;
+
+      /**
+       * 최종 도착 위치
+       * 우리가 화면에서 맞춰둔 위치는 고정
+       */
+      this.characterEndPosition.set(
+        0.002,
+        -0.0045,
+        -0.001,
+      );
+
+      /**
+       * 시작 위치는
+       * 최종 위치에서 이동거리만큼 뒤로 계산
+       */
+      this.characterStartPosition
+        .copy(this.characterEndPosition)
+        .sub(this.characterMoveOffset);
+
+      /**
+       * 처음에는 시작점에 배치
+       */
+      this.characterWrapper.position.copy(
+        this.characterStartPosition,
+      );
+
+      /**
+       * 캐릭터 걷기 Animation
+       */
+      if (gltf.animations.length > 0) {
+        this.characterMixer =
+          new THREE.AnimationMixer(
+            this.characterRoot,
+          );
+
+        const clip =
+          gltf.animations.find(
+            (animation) =>
+              animation.name ===
+              'ArmatureAction',
+          ) ??
+          gltf.animations[0];
+
+        this.characterAction =
+          this.characterMixer.clipAction(
+            clip,
+          );
+
+        this.characterAction.setLoop(
+          THREE.LoopRepeat,
+          Infinity,
+        );
+
+        // trigger 전에는 멈춤
+        this.characterAction.stop();
+
+        console.log(
+          'Woody character animation:',
+          clip.name,
+          `${clip.duration}초`,
+        );
+      }
+
+
+      /**
+       * 위치 조절용 콘솔 함수
+       */
+      window.setWoodyCharacter = (
+        x,
+        y,
+        z,
+        scale = 0.012,
+      ) => {
+        this.characterWrapper.position.set(
+          x,
+          y,
+          z,
+        );
+
+        this.characterWrapper.scale.setScalar(
+          scale,
+        );
+
+        // 지금 조절한 위치를 최종 도착점으로 저장
+        this.characterEndPosition.copy(
+          this.characterWrapper.position,
+        );
+
+        // 시작점은 그보다 뒤에서 자동 계산
+        this.characterStartPosition
+          .copy(this.characterEndPosition)
+          .sub(this.characterMoveOffset);
+
+        console.log(
+          'Woody character:',
+          {
+            position:
+              this.characterWrapper.position
+                .toArray(),
+
+            scale:
+              this.characterWrapper.scale.x,
+          },
+        );
+      };
+
+      window.moveWoodyCharacter = (
+        x = 0,
+        y = 0,
+        z = 0,
+      ) => {
+        this.characterWrapper.position.add(
+          new THREE.Vector3(x, y, z),
+        );
+
+        this.characterEndPosition.copy(
+          this.characterWrapper.position,
+        );
+
+        this.characterStartPosition
+          .copy(this.characterEndPosition)
+          .sub(this.characterMoveOffset);
+
+        console.log(
+          'Woody character position:',
+          this.characterWrapper.position.toArray(),
+        );
+      };
+
+      window.scaleWoodyCharacter = (
+        scale,
+      ) => {
+        this.characterWrapper.scale.setScalar(
+          scale,
+        );
+
+        console.log(
+          'Woody character scale:',
+          scale,
+        );
+      };
+
+
+      console.log(
+        'Woody 캐릭터 로딩 완료',
+      );
+    } catch (error) {
+      console.error(
+        'Woody 캐릭터 로딩 실패:',
+        error,
+      );
+    }
+  }
+
   createBugOnePath() {
     if (!this.bugOneInitial) {
       return;
@@ -611,7 +916,7 @@ this.root.traverse((object) => {
 
     const base =
       this.bugOneInitial.position;
-      
+
     const start =
       new THREE.Vector3(
         base.x - 0.013,
