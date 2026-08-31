@@ -46,6 +46,50 @@ export class WoodyScene {
     this.bugTwoFlightDuration = 10;
 
     /**
+     * Woody 캐릭터
+     */
+    this.characterUrl =
+      options.characterUrl ??
+      '/models/woody/woody_character.glb';
+
+    this.characterWrapper = null;
+    this.characterRoot = null;
+
+    this.characterMixer = null;
+    this.characterAction = null;
+
+    // 캐릭터 앞 작은 반딧불
+    this.characterFirefly = null;
+    this.characterFireflyInitial = null;
+
+    // 반딧불 움직임 설정
+    this.characterFireflyRadiusX = 0.2;
+    this.characterFireflyRadiusY = 0.08;
+    this.characterFireflyRadiusZ = 0.04;
+
+    this.characterFireflySpeed = 1.4;
+
+    this.characterStartPosition =
+      new THREE.Vector3();
+
+    this.characterEndPosition =
+      new THREE.Vector3();
+
+    this.characterMoveElapsed = 0;
+
+    // 앞으로 걸어오는 시간
+    this.characterMoveDuration = 3;
+
+    // Woody 기준 이동 거리
+    // 카메라 쪽이 +Z 방향이므로 +Z로 이동
+    this.characterMoveOffset =
+      new THREE.Vector3(
+        0,
+        0,
+        0.015,
+      );
+
+    /**
      * 카메라
      */
     this.sourceCamera = null;
@@ -297,6 +341,8 @@ this.root.traverse((object) => {
       this.motionScale,
     );
 
+    await this.loadCharacter(loader);
+
     /**
      * 5. EXR 배경
      */
@@ -522,6 +568,30 @@ this.root.traverse((object) => {
     this.isRunning = true;
 
     /**
+     * 캐릭터 초기화
+     */
+    this.characterMoveElapsed = 0;
+
+    if (this.characterWrapper) {
+      this.characterWrapper.position.copy(
+        this.characterStartPosition,
+      );
+    }
+
+    /**
+     * 걷기 애니메이션 시작
+     */
+    if (this.characterAction) {
+      this.characterAction
+        .reset()
+        .setLoop(
+          THREE.LoopRepeat,
+          Infinity,
+        )
+        .play();
+    }
+
+    /**
      * 디자이너의 4초짜리 애니메이션 시작
      */
     if (this.animationAction) {
@@ -547,9 +617,18 @@ this.root.traverse((object) => {
       this.bugOne &&
       this.bugOneInitial
     ) {
-      this.bugOne.position.copy(
-        this.bugOneInitial.position,
-      );
+      const bugOneStart =
+        this.bugOneCurve?.getPointAt(0);
+
+      if (bugOneStart) {
+        this.bugOne.position.copy(
+          bugOneStart,
+        );
+      } else {
+        this.bugOne.position.copy(
+          this.bugOneInitial.position,
+        );
+      }
 
       this.bugOne.quaternion.copy(
         this.bugOneInitial.quaternion,
@@ -584,6 +663,51 @@ this.root.traverse((object) => {
     }
 
     /**
+     * 캐릭터 걷기 animation은
+     * 계속 반복
+     */
+    if (this.characterMixer) {
+      this.characterMixer.update(
+        deltaTime,
+      );
+    }
+
+
+    /**
+     * 캐릭터 위치 이동은
+     * 처음 4.5초 동안만
+     */
+    if (
+      this.characterWrapper &&
+      this.characterMoveElapsed <
+        this.characterMoveDuration
+    ) {
+      this.characterMoveElapsed +=
+        deltaTime;
+
+      const t =
+        Math.min(
+          this.characterMoveElapsed /
+            this.characterMoveDuration,
+          1,
+        );
+
+      /**
+       * 처음/끝에서 너무 갑자기
+       * 출발하거나 멈추지 않도록
+       * 부드럽게 보간
+       */
+      const smoothT =
+        t * t * (3 - 2 * t);
+
+      this.characterWrapper.position.lerpVectors(
+        this.characterStartPosition,
+        this.characterEndPosition,
+        smoothT,
+      );
+    }
+
+    /**
      * 우리가 코드로 만드는 반딧불 모션
      */
     this.updateBugOne(
@@ -593,159 +717,476 @@ this.root.traverse((object) => {
     this.updateBugTwo(
       this.elapsedTime,
     );
+
+    this.updateCharacterFirefly(
+    this.elapsedTime,
+  );
   }
+
+  async loadCharacter(loader) {
+    try {
+      const gltf =
+        await loader.loadAsync(
+          this.characterUrl,
+        );
+
+      this.characterRoot =
+        gltf.scene;
+
+        /**
+       * 캐릭터 앞 작은 반딧불
+       */
+      this.characterFirefly =
+        this.characterRoot.getObjectByName(
+          'Sphere',
+        );
+
+      if (this.characterFirefly) {
+        this.characterFireflyInitial =
+          this.characterFirefly.position.clone();
+
+        console.log(
+          'Woody character firefly:',
+          this.characterFirefly,
+        );
+
+        console.log(
+          'Firefly initial position:',
+          this.characterFireflyInitial.toArray(),
+        );
+      } else {
+        console.warn(
+          '캐릭터 반딧불 Sphere를 찾지 못했습니다.',
+        );
+      }
+
+      /**
+       * 캐릭터 전체를 움직이기 위한 Wrapper.
+       *
+       * Armature animation은 characterRoot에서,
+       * 실제 앞으로 이동은 Wrapper에서 처리한다.
+       */
+      this.characterWrapper =
+        new THREE.Group();
+
+      this.characterWrapper.add(
+        this.characterRoot,
+      );
+
+      this.root.add(
+        this.characterWrapper,
+      );
+
+
+      /**
+       * 캐릭터 크기
+       */
+      this.characterWrapper.scale.setScalar(
+        0.0055,
+      );
+
+
+      /**
+       * 모델의 가장 아래 지점을
+       * Wrapper의 Y=0으로 맞춤.
+       */
+      const box =
+        new THREE.Box3().setFromObject(
+          this.characterRoot,
+        );
+
+      this.characterRoot.position.y -=
+        box.min.y;
+
+      /**
+       * 최종 도착 위치
+       * 우리가 화면에서 맞춰둔 위치는 고정
+       */
+      this.characterEndPosition.set(
+        0.002,
+        -0.0045,
+        0.005,
+      );
+
+      /**
+       * 시작 위치는
+       * 최종 위치에서 이동거리만큼 뒤로 계산
+       */
+      this.characterStartPosition
+        .copy(this.characterEndPosition)
+        .sub(this.characterMoveOffset);
+
+      /**
+       * 처음에는 시작점에 배치
+       */
+      this.characterWrapper.position.copy(
+        this.characterStartPosition,
+      );
+
+      /**
+       * 캐릭터 걷기 Animation
+       */
+      if (gltf.animations.length > 0) {
+        this.characterMixer =
+          new THREE.AnimationMixer(
+            this.characterRoot,
+          );
+
+        const clip =
+          gltf.animations.find(
+            (animation) =>
+              animation.name ===
+              'ArmatureAction',
+          ) ??
+          gltf.animations[0];
+
+        this.characterAction =
+          this.characterMixer.clipAction(
+            clip,
+          );
+
+        // 걷기 애니메이션 속도
+        this.characterAction.timeScale = 0.5;
+
+        this.characterAction.setLoop(
+          THREE.LoopRepeat,
+          Infinity,
+        );
+
+        // trigger 전에는 멈춤
+        this.characterAction.stop();
+
+        console.log(
+          'Woody character animation:',
+          clip.name,
+          `${clip.duration}초`,
+        );
+      }
+
+
+      /**
+       * 위치 조절용 콘솔 함수
+       */
+      window.setWoodyCharacter = (
+        x,
+        y,
+        z,
+        scale = 0.012,
+      ) => {
+        this.characterWrapper.position.set(
+          x,
+          y,
+          z,
+        );
+
+        this.characterWrapper.scale.setScalar(
+          scale,
+        );
+
+        // 지금 조절한 위치를 최종 도착점으로 저장
+        this.characterEndPosition.copy(
+          this.characterWrapper.position,
+        );
+
+        // 시작점은 그보다 뒤에서 자동 계산
+        this.characterStartPosition
+          .copy(this.characterEndPosition)
+          .sub(this.characterMoveOffset);
+
+        console.log(
+          'Woody character:',
+          {
+            position:
+              this.characterWrapper.position
+                .toArray(),
+
+            scale:
+              this.characterWrapper.scale.x,
+          },
+        );
+      };
+
+      window.moveWoodyCharacter = (
+        x = 0,
+        y = 0,
+        z = 0,
+      ) => {
+        this.characterWrapper.position.add(
+          new THREE.Vector3(x, y, z),
+        );
+
+        this.characterEndPosition.copy(
+          this.characterWrapper.position,
+        );
+
+        this.characterStartPosition
+          .copy(this.characterEndPosition)
+          .sub(this.characterMoveOffset);
+
+        console.log(
+          'Woody character position:',
+          this.characterWrapper.position.toArray(),
+        );
+      };
+
+      window.scaleWoodyCharacter = (
+        scale,
+      ) => {
+        this.characterWrapper.scale.setScalar(
+          scale,
+        );
+
+        console.log(
+          'Woody character scale:',
+          scale,
+        );
+      };
+
+
+      console.log(
+        'Woody 캐릭터 로딩 완료',
+      );
+    } catch (error) {
+      console.error(
+        'Woody 캐릭터 로딩 실패:',
+        error,
+      );
+    }
+  }
+
+  updateCharacterFirefly(time) {
+    if (
+      !this.characterFirefly ||
+      !this.characterFireflyInitial
+    ) {
+      return;
+    }
+
+    const base =
+      this.characterFireflyInitial;
+
+    const t =
+      time *
+      this.characterFireflySpeed;
+
+    /**
+     * 완전한 원이 아니라
+     * 살짝 불규칙한 3D 타원 궤도.
+     *
+     * 캐릭터 앞에서 멀리 벗어나지 않고
+     * 작은 반딧불처럼 둥글게 떠다님.
+     */
+    this.characterFirefly.position.x =
+      base.x +
+      Math.cos(t) *
+        this.characterFireflyRadiusX;
+
+    this.characterFirefly.position.y =
+      base.y +
+      Math.sin(t) *
+        this.characterFireflyRadiusY;
+
+    this.characterFirefly.position.z =
+      base.z +
+      Math.sin(t * 0.65) *
+        this.characterFireflyRadiusZ;
+    }
 
   createBugOnePath() {
-  if (!this.bugOneInitial) {
-    return;
+    if (!this.bugOneInitial) {
+      return;
+    }
+
+    const base =
+      this.bugOneInitial.position;
+
+    const start =
+      new THREE.Vector3(
+        base.x - 0.013,
+        base.y + 0.00125,
+        base.z - 0.0135,
+      );
+
+    this.bugOneCurve =
+      new THREE.CatmullRomCurve3(
+        [
+          // 1. 새로운 시작점 — 동선 가운데
+          start,
+
+          // 2. 중앙에서 오른쪽으로 자연스럽게 이동
+          new THREE.Vector3(
+            base.x - 0.006,
+            base.y + 0.0035,
+            base.z - 0.010,
+          ),
+
+          // 3. 오른쪽 영역 진입
+          new THREE.Vector3(
+            base.x + 0.001,
+            base.y + 0.004,
+            base.z - 0.007,
+          ),
+
+          // 4. 오른쪽으로 넓게
+          new THREE.Vector3(
+            base.x + 0.005,
+            base.y + 0.0045,
+            base.z - 0.004,
+          ),
+
+          // 5. 오른쪽 끝 진입
+          new THREE.Vector3(
+            base.x + 0.008,
+            base.y + 0.0045,
+            base.z + 0.001,
+          ),
+
+          // 6. 오른쪽 바깥쪽
+          new THREE.Vector3(
+            base.x + 0.010,
+            base.y + 0.0041,
+            base.z + 0.005,
+          ),
+
+          // 7. 가장 오른쪽
+          new THREE.Vector3(
+            base.x + 0.011,
+            base.y + 0.0037,
+            base.z + 0.008,
+          ),
+
+          // 8. 둥글게 방향 전환
+          new THREE.Vector3(
+            base.x + 0.0105,
+            base.y + 0.0033,
+            base.z + 0.009,
+          ),
+
+          // 9. 왼쪽 방향으로 서서히 전환
+          new THREE.Vector3(
+            base.x + 0.0095,
+            base.y + 0.0029,
+            base.z + 0.008,
+          ),
+
+          // 10. 완만하게 하강하면서 왼쪽
+          new THREE.Vector3(
+            base.x + 0.008,
+            base.y + 0.0025,
+            base.z + 0.0065,
+          ),
+
+          // 11. 계속 왼쪽으로
+          new THREE.Vector3(
+            base.x + 0.006,
+            base.y + 0.0021,
+            base.z + 0.0045,
+          ),
+
+          // 12. 중앙 쪽으로 접근
+          new THREE.Vector3(
+            base.x + 0.0035,
+            base.y + 0.0018,
+            base.z + 0.0025,
+          ),
+
+          // 13. 오른쪽 영역을 완전히 빠져나옴
+          // 기존 base.y = 0 으로 떨어지지 않게 함
+          new THREE.Vector3(
+            base.x + 0.001,
+            base.y + 0.0016,
+            base.z + 0.001,
+          ),
+
+          // 14. 왼쪽 방향 유지
+          new THREE.Vector3(
+            base.x - 0.003,
+            base.y + 0.0016,
+            base.z + 0.001,
+          ),
+
+          // 15. 기존 왼쪽 진입 구간
+          new THREE.Vector3(
+            base.x - 0.010,
+            base.y + 0.002,
+            base.z + 0.002,
+          ),
+
+          // 16. 나무 앞쪽으로 접근
+          new THREE.Vector3(
+            base.x - 0.025,
+            base.y + 0.001,
+            base.z + 0.012,
+          ),
+
+          // 17. 나무 앞쪽 통과
+          new THREE.Vector3(
+            base.x - 0.035,
+            base.y + 0.0015,
+            base.z + 0.020,
+          ),
+
+          // 18. 나뭇잎 아래로 왼쪽
+          new THREE.Vector3(
+            base.x - 0.047,
+            base.y + 0.002,
+            base.z + 0.015,
+          ),
+
+          // 19. 나무 거의 벗어남
+          new THREE.Vector3(
+            base.x - 0.052,
+            base.y + 0.003,
+            base.z + 0.007,
+          ),
+
+          // 20. 왼쪽 끝에서 상승
+          new THREE.Vector3(
+            base.x - 0.055,
+            base.y + 0.006,
+            base.z - 0.004,
+          ),
+
+          // 21. 나무 뒤쪽
+          new THREE.Vector3(
+            base.x - 0.052,
+            base.y + 0.003,
+            base.z - 0.016,
+          ),
+
+          // 22. 가장 뒤쪽 + 살짝 아래
+          new THREE.Vector3(
+            base.x - 0.045,
+            base.y - 0.002,
+            base.z - 0.030,
+          ),
+
+          // 23. 뒤쪽에서 오른쪽으로 복귀
+          new THREE.Vector3(
+            base.x - 0.034,
+            base.y - 0.004,
+            base.z - 0.026,
+          ),
+
+          // 24. 시작점 직전
+          new THREE.Vector3(
+            base.x - 0.020,
+            base.y - 0.001,
+            base.z - 0.017,
+          ),
+        ],
+
+        true,
+        'centripetal',
+      );
+
+    /**
+     * getPointAt()의 거리 계산 정밀도 증가.
+     * 의도하지 않은 미세한 속도 튐 방지.
+     */
+    this.bugOneCurve.arcLengthDivisions = 1000;
+    this.bugOneCurve.updateArcLengths();
   }
-
-  const base =
-    this.bugOneInitial.position;
-
-  /**
-   * 현재 Woody 카메라가 상당히 확대되어 있어서
-   * motionScale을 사용하지 않고
-   * 실제 world 좌표 기준으로 아주 작게 이동시킨다.
-   */
-  this.bugOneCurve =
-    new THREE.CatmullRomCurve3(
-      [
-          // 1. 시작
-        new THREE.Vector3(
-          base.x,
-          base.y,
-          base.z,
-        ),
-
-        // 2. 왼쪽 + 살짝 위
-        new THREE.Vector3(
-          base.x - 0.010,
-          base.y + 0.002,
-          base.z + 0.002,
-        ),
-
-        // 3. 나무 앞쪽으로 접근
-        new THREE.Vector3(
-          base.x - 0.025,
-          base.y + 0.001,
-          base.z + 0.012,
-        ),
-
-        // 4. 나무 앞쪽 통과
-        new THREE.Vector3(
-          base.x - 0.035,
-          base.y + 0.0015,
-          base.z + 0.020,
-        ),
-
-        // 5. 나뭇잎 아래로 왼쪽 이동
-        new THREE.Vector3(
-          base.x - 0.047,
-          base.y + 0.002,
-          base.z + 0.015,
-        ),
-
-        // 6. 나무를 거의 벗어난 지점
-        new THREE.Vector3(
-          base.x - 0.052,
-          base.y + 0.003,
-          base.z + 0.007,
-        ),
-
-        // 7. 나무를 완전히 지난 뒤부터 위로 상승
-        new THREE.Vector3(
-          base.x - 0.055,
-          base.y + 0.006,
-          base.z - 0.004,
-        ),
-
-        // 8. 나무 뒤쪽
-        new THREE.Vector3(
-          base.x - 0.052,
-          base.y + 0.003,
-          base.z - 0.016,
-        ),
-
-        // 9. 가장 뒤쪽 + 살짝 아래
-        new THREE.Vector3(
-          base.x - 0.045,
-          base.y - 0.002,
-          base.z - 0.030,
-        ),
-
-        // 10. 뒤쪽에서 오른쪽으로 복귀
-        new THREE.Vector3(
-          base.x - 0.034,
-          base.y - 0.004,
-          base.z - 0.026,
-        ),
-
-        // 11. 천천히 앞으로
-        new THREE.Vector3(
-          base.x - 0.020,
-          base.y - 0.001,
-          base.z - 0.017,
-        ),
-
-        // 12. 중앙 근처까지 복귀
-        new THREE.Vector3(
-          base.x - 0.006,
-          base.y + 0.0035,
-          base.z - 0.010,
-        ),
-
-        // 13. 오른쪽으로 접근
-        new THREE.Vector3(
-          base.x + 0.001,
-          base.y + 0.004,
-          base.z - 0.007,
-        ),
-
-        // 14. 오른쪽 아래쪽 커브
-        new THREE.Vector3(
-          base.x + 0.005,
-          base.y + 0.0045,
-          base.z - 0.003,
-        ),
-
-        // 15. 오른쪽 끝
-        // 높이는 거의 올리지 않음
-        new THREE.Vector3(
-          base.x + 0.007,
-          base.y + 0.0045,
-          base.z + 0.001,
-        ),
-
-        // 16. 오른쪽 끝에서 앞쪽으로 둥글게 회전
-        new THREE.Vector3(
-          base.x + 0.0065,
-          base.y + 0.004,
-          base.z + 0.005,
-        ),
-
-        // 17. 왼쪽 방향으로 전환
-        new THREE.Vector3(
-          base.x + 0.004,
-          base.y + 0.003,
-          base.z + 0.007,
-        ),
-
-        // 18. 시작점으로 들어오기 직전
-        new THREE.Vector3(
-          base.x + 0.0015,
-          base.y + 0.0015,
-          base.z + 0.004,
-        ),
-      ],
-
-      true,
-
-      // overshoot가 비교적 적어서
-      // 장애물 사이 경로에 더 적합
-      'centripetal',
-    );
-}
 
 createBugTwoPath() {
   if (!this.bugTwoInitial) {
