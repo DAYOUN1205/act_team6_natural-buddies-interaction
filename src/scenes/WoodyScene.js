@@ -87,7 +87,7 @@ export class WoodyScene {
     const gltf =
       await loader.loadAsync(this.modelUrl);
 
-    thisoot = gltf.scene;
+    this.root = gltf.scene;
     
     this.root.traverse((object) => {
       if (!object.isMesh || !object.material) {
