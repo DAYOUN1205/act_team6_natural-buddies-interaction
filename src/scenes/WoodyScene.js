@@ -547,9 +547,18 @@ this.root.traverse((object) => {
       this.bugOne &&
       this.bugOneInitial
     ) {
-      this.bugOne.position.copy(
-        this.bugOneInitial.position,
-      );
+      const bugOneStart =
+        this.bugOneCurve?.getPointAt(0);
+
+      if (bugOneStart) {
+        this.bugOne.position.copy(
+          bugOneStart,
+        );
+      } else {
+        this.bugOne.position.copy(
+          this.bugOneInitial.position,
+        );
+      }
 
       this.bugOne.quaternion.copy(
         this.bugOneInitial.quaternion,
@@ -596,156 +605,200 @@ this.root.traverse((object) => {
   }
 
   createBugOnePath() {
-  if (!this.bugOneInitial) {
-    return;
+    if (!this.bugOneInitial) {
+      return;
+    }
+
+    const base =
+      this.bugOneInitial.position;
+      
+    const start =
+      new THREE.Vector3(
+        base.x - 0.013,
+        base.y + 0.00125,
+        base.z - 0.0135,
+      );
+
+    this.bugOneCurve =
+      new THREE.CatmullRomCurve3(
+        [
+          // 1. 새로운 시작점 — 동선 가운데
+          start,
+
+          // 2. 중앙에서 오른쪽으로 자연스럽게 이동
+          new THREE.Vector3(
+            base.x - 0.006,
+            base.y + 0.0035,
+            base.z - 0.010,
+          ),
+
+          // 3. 오른쪽 영역 진입
+          new THREE.Vector3(
+            base.x + 0.001,
+            base.y + 0.004,
+            base.z - 0.007,
+          ),
+
+          // 4. 오른쪽으로 넓게
+          new THREE.Vector3(
+            base.x + 0.005,
+            base.y + 0.0045,
+            base.z - 0.004,
+          ),
+
+          // 5. 오른쪽 끝 진입
+          new THREE.Vector3(
+            base.x + 0.008,
+            base.y + 0.0045,
+            base.z + 0.001,
+          ),
+
+          // 6. 오른쪽 바깥쪽
+          new THREE.Vector3(
+            base.x + 0.010,
+            base.y + 0.0041,
+            base.z + 0.005,
+          ),
+
+          // 7. 가장 오른쪽
+          new THREE.Vector3(
+            base.x + 0.011,
+            base.y + 0.0037,
+            base.z + 0.008,
+          ),
+
+          // 8. 둥글게 방향 전환
+          new THREE.Vector3(
+            base.x + 0.0105,
+            base.y + 0.0033,
+            base.z + 0.009,
+          ),
+
+          // 9. 왼쪽 방향으로 서서히 전환
+          new THREE.Vector3(
+            base.x + 0.0095,
+            base.y + 0.0029,
+            base.z + 0.008,
+          ),
+
+          // 10. 완만하게 하강하면서 왼쪽
+          new THREE.Vector3(
+            base.x + 0.008,
+            base.y + 0.0025,
+            base.z + 0.0065,
+          ),
+
+          // 11. 계속 왼쪽으로
+          new THREE.Vector3(
+            base.x + 0.006,
+            base.y + 0.0021,
+            base.z + 0.0045,
+          ),
+
+          // 12. 중앙 쪽으로 접근
+          new THREE.Vector3(
+            base.x + 0.0035,
+            base.y + 0.0018,
+            base.z + 0.0025,
+          ),
+
+          // 13. 오른쪽 영역을 완전히 빠져나옴
+          // 기존 base.y = 0 으로 떨어지지 않게 함
+          new THREE.Vector3(
+            base.x + 0.001,
+            base.y + 0.0016,
+            base.z + 0.001,
+          ),
+
+          // 14. 왼쪽 방향 유지
+          new THREE.Vector3(
+            base.x - 0.003,
+            base.y + 0.0016,
+            base.z + 0.001,
+          ),
+
+          // 15. 기존 왼쪽 진입 구간
+          new THREE.Vector3(
+            base.x - 0.010,
+            base.y + 0.002,
+            base.z + 0.002,
+          ),
+
+          // 16. 나무 앞쪽으로 접근
+          new THREE.Vector3(
+            base.x - 0.025,
+            base.y + 0.001,
+            base.z + 0.012,
+          ),
+
+          // 17. 나무 앞쪽 통과
+          new THREE.Vector3(
+            base.x - 0.035,
+            base.y + 0.0015,
+            base.z + 0.020,
+          ),
+
+          // 18. 나뭇잎 아래로 왼쪽
+          new THREE.Vector3(
+            base.x - 0.047,
+            base.y + 0.002,
+            base.z + 0.015,
+          ),
+
+          // 19. 나무 거의 벗어남
+          new THREE.Vector3(
+            base.x - 0.052,
+            base.y + 0.003,
+            base.z + 0.007,
+          ),
+
+          // 20. 왼쪽 끝에서 상승
+          new THREE.Vector3(
+            base.x - 0.055,
+            base.y + 0.006,
+            base.z - 0.004,
+          ),
+
+          // 21. 나무 뒤쪽
+          new THREE.Vector3(
+            base.x - 0.052,
+            base.y + 0.003,
+            base.z - 0.016,
+          ),
+
+          // 22. 가장 뒤쪽 + 살짝 아래
+          new THREE.Vector3(
+            base.x - 0.045,
+            base.y - 0.002,
+            base.z - 0.030,
+          ),
+
+          // 23. 뒤쪽에서 오른쪽으로 복귀
+          new THREE.Vector3(
+            base.x - 0.034,
+            base.y - 0.004,
+            base.z - 0.026,
+          ),
+
+          // 24. 시작점 직전
+          new THREE.Vector3(
+            base.x - 0.020,
+            base.y - 0.001,
+            base.z - 0.017,
+          ),
+        ],
+
+        true,
+        'centripetal',
+      );
+
+    /**
+     * getPointAt()의 거리 계산 정밀도 증가.
+     * 의도하지 않은 미세한 속도 튐 방지.
+     */
+    this.bugOneCurve.arcLengthDivisions = 1000;
+    this.bugOneCurve.updateArcLengths();
   }
-
-  const base =
-    this.bugOneInitial.position;
-
-  /**
-   * 현재 Woody 카메라가 상당히 확대되어 있어서
-   * motionScale을 사용하지 않고
-   * 실제 world 좌표 기준으로 아주 작게 이동시킨다.
-   */
-  this.bugOneCurve =
-    new THREE.CatmullRomCurve3(
-      [
-          // 1. 시작
-        new THREE.Vector3(
-          base.x,
-          base.y,
-          base.z,
-        ),
-
-        // 2. 왼쪽 + 살짝 위
-        new THREE.Vector3(
-          base.x - 0.010,
-          base.y + 0.002,
-          base.z + 0.002,
-        ),
-
-        // 3. 나무 앞쪽으로 접근
-        new THREE.Vector3(
-          base.x - 0.025,
-          base.y + 0.001,
-          base.z + 0.012,
-        ),
-
-        // 4. 나무 앞쪽 통과
-        new THREE.Vector3(
-          base.x - 0.035,
-          base.y + 0.0015,
-          base.z + 0.020,
-        ),
-
-        // 5. 나뭇잎 아래로 왼쪽 이동
-        new THREE.Vector3(
-          base.x - 0.047,
-          base.y + 0.002,
-          base.z + 0.015,
-        ),
-
-        // 6. 나무를 거의 벗어난 지점
-        new THREE.Vector3(
-          base.x - 0.052,
-          base.y + 0.003,
-          base.z + 0.007,
-        ),
-
-        // 7. 나무를 완전히 지난 뒤부터 위로 상승
-        new THREE.Vector3(
-          base.x - 0.055,
-          base.y + 0.006,
-          base.z - 0.004,
-        ),
-
-        // 8. 나무 뒤쪽
-        new THREE.Vector3(
-          base.x - 0.052,
-          base.y + 0.003,
-          base.z - 0.016,
-        ),
-
-        // 9. 가장 뒤쪽 + 살짝 아래
-        new THREE.Vector3(
-          base.x - 0.045,
-          base.y - 0.002,
-          base.z - 0.030,
-        ),
-
-        // 10. 뒤쪽에서 오른쪽으로 복귀
-        new THREE.Vector3(
-          base.x - 0.034,
-          base.y - 0.004,
-          base.z - 0.026,
-        ),
-
-        // 11. 천천히 앞으로
-        new THREE.Vector3(
-          base.x - 0.020,
-          base.y - 0.001,
-          base.z - 0.017,
-        ),
-
-        // 12. 중앙 근처까지 복귀
-        new THREE.Vector3(
-          base.x - 0.006,
-          base.y + 0.0035,
-          base.z - 0.010,
-        ),
-
-        // 13. 오른쪽으로 접근
-        new THREE.Vector3(
-          base.x + 0.001,
-          base.y + 0.004,
-          base.z - 0.007,
-        ),
-
-        // 14. 오른쪽 아래쪽 커브
-        new THREE.Vector3(
-          base.x + 0.005,
-          base.y + 0.0045,
-          base.z - 0.003,
-        ),
-
-        // 15. 오른쪽 끝
-        // 높이는 거의 올리지 않음
-        new THREE.Vector3(
-          base.x + 0.007,
-          base.y + 0.0045,
-          base.z + 0.001,
-        ),
-
-        // 16. 오른쪽 끝에서 앞쪽으로 둥글게 회전
-        new THREE.Vector3(
-          base.x + 0.0065,
-          base.y + 0.004,
-          base.z + 0.005,
-        ),
-
-        // 17. 왼쪽 방향으로 전환
-        new THREE.Vector3(
-          base.x + 0.004,
-          base.y + 0.003,
-          base.z + 0.007,
-        ),
-
-        // 18. 시작점으로 들어오기 직전
-        new THREE.Vector3(
-          base.x + 0.0015,
-          base.y + 0.0015,
-          base.z + 0.004,
-        ),
-      ],
-
-      true,
-
-      // overshoot가 비교적 적어서
-      // 장애물 사이 경로에 더 적합
-      'centripetal',
-    );
-}
 
 createBugTwoPath() {
   if (!this.bugTwoInitial) {
