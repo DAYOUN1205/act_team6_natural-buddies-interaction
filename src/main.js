@@ -43,6 +43,28 @@ async function main() {
     onStatus: setStatus,
   });
 
+  const freshScene =
+  new FreshScene(
+    app.scene,
+    {
+      videoUrl:
+        '/videos/fresh_animation.mp4',
+
+      onStatus: setStatus,
+    },
+  );
+
+  const amberScene =
+  new AmberScene(
+    app.scene,
+    {
+      videoUrl:
+        '/videos/amber_animation.mp4',
+
+      onStatus: setStatus,
+    },
+  );
+
   
   /**
    * 모든 향 Scene 등록
@@ -58,6 +80,15 @@ async function main() {
     woodyScene,
   );
 
+  await sceneManager.add(
+    'fresh',
+    freshScene,
+  );
+
+  await sceneManager.add(
+    'amber',
+    amberScene,
+  );
 
   /**
    * 초기 화면
