@@ -11,6 +11,16 @@ import { RectAreaLightUniformsLib } from
 
 export class FloralScene {
   constructor(parentScene, options = {}) {
+    this.characterUrl =
+      options.characterUrl ??
+      '/models/floral/floral_character.glb';
+
+    this.characterWrapper = null;
+    this.characterRoot = null;
+
+    this.characterMixer = null;
+    this.characterAction = null;
+
     this.parentScene = parentScene;
 
     this.modelUrl =
@@ -144,6 +154,166 @@ export class FloralScene {
 
     this.inspectMainFlowers();
     this.prepareFlowers(); 
+    /**
+     * 캐릭터 로드
+     */
+    try {
+      const characterGltf =
+        await gltfLoader.loadAsync(
+          this.characterUrl,
+        );
+
+      this.characterRoot =
+        characterGltf.scene;
+
+      /**
+       * 캐릭터 전체를 한 번에
+       * 위치/크기 조절하기 위한 Wrapper
+       */
+      this.characterWrapper =
+        new THREE.Group();
+
+      this.characterWrapper.add(
+        this.characterRoot,
+      );
+
+      this.root.add(
+        this.characterWrapper,
+      );
+
+      /**
+       * GLB 자체 원점이 이상한 위치에 있어서
+       * 캐릭터를 가운데 + 바닥 기준으로 정렬
+       */
+      this.characterRoot.updateMatrixWorld(true);
+
+      const characterBox =
+        new THREE.Box3().setFromObject(
+          this.characterRoot,
+        );
+
+      const characterCenter =
+        characterBox.getCenter(
+          new THREE.Vector3(),
+        );
+
+      this.characterRoot.position.x -=
+        characterCenter.x;
+
+      this.characterRoot.position.z -=
+        characterCenter.z;
+
+      this.characterRoot.position.y -=
+        characterBox.min.y;
+
+      /**
+       * 첫 번째 배치값
+       *
+       * 지금 Floral 카메라 구도와
+       * 네가 표시한 원 위치 기준으로 잡은 시작값
+       */
+      this.characterWrapper.position.set(
+        -0.29,  // 좌우
+        1.18,   // 높이
+        -0.20,  // 앞뒤
+      );
+
+      this.characterWrapper.scale.setScalar(
+        0.03,
+      );
+
+      /**
+       * 처음에는 숨김
+       * Floral trigger 때 나타나게 함
+       */
+      this.characterWrapper.visible = false;
+
+      /**
+       * 메인 캐릭터 애니메이션
+       */
+      if (characterGltf.animations.length > 0) {
+        this.characterMixer =
+          new THREE.AnimationMixer(
+            this.characterRoot,
+          );
+
+        const clip =
+          characterGltf.animations.find(
+            (animation) =>
+              animation.name ===
+              'ArmatureAction',
+          ) ??
+          characterGltf.animations[0];
+
+        this.characterAction =
+          this.characterMixer.clipAction(
+            clip,
+          );
+
+        this.characterAction.setLoop(
+          THREE.LoopRepeat,
+          Infinity,
+        );
+
+        console.log(
+          'Floral character animation:',
+          clip.name,
+          clip.duration,
+        );
+      }
+
+      /**
+       * 위치 조절용 콘솔 함수
+       */
+      window.getFloralCharacter =
+        () => {
+          console.log(
+            'position:',
+            this.characterWrapper.position.toArray(),
+          );
+
+          console.log(
+            'scale:',
+            this.characterWrapper.scale.x,
+          );
+        };
+
+      window.moveFloralCharacter =
+        (
+          x = 0,
+          y = 0,
+          z = 0,
+        ) => {
+          this.characterWrapper.position.x += x;
+          this.characterWrapper.position.y += y;
+          this.characterWrapper.position.z += z;
+
+          console.log(
+            this.characterWrapper.position.toArray(),
+          );
+        };
+
+      window.scaleFloralCharacter =
+        (scale) => {
+          this.characterWrapper.scale.setScalar(
+            scale,
+          );
+
+          console.log(
+            'character scale:',
+            scale,
+          );
+        };
+
+      console.log(
+        'Floral 캐릭터 로딩 완료',
+      );
+    } catch (error) {
+      console.error(
+        'Floral 캐릭터 로딩 실패:',
+        error,
+      );
+    }
 
     /**
      * 배경
@@ -848,6 +1018,21 @@ onActivate() {
     this.state = 'blooming';
     this.elapsedTime = 0;
 
+    if (
+      this.characterWrapper &&
+      this.characterAction
+    ) {
+      this.characterWrapper.visible = true;
+
+      this.characterAction
+        .reset()
+        .setLoop(
+          THREE.LoopRepeat,
+          Infinity,
+        )
+        .play();
+    }
+
     this.onStatus(
       'FLORAL 꽃 개화 시작',
     );
@@ -855,14 +1040,23 @@ onActivate() {
 
   update(deltaTime) {
     if (
-      this.state !==
-      'blooming'
+      this.characterMixer &&
+      this.characterWrapper?.visible
+    ) {
+      this.characterMixer.update(
+        deltaTime,
+      );
+    }
+
+    if (
+      this.state !== 'blooming'
     ) {
       return;
     }
 
     this.elapsedTime +=
       deltaTime;
+
 
     /**
      * flower1
