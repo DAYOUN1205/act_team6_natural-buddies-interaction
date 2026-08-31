@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 
 export class WoodyScene {
   constructor(parentScene, options = {}) {
-    this.parentScene = parentScene;
+    this.enableCameraDebug =
+      options.enableCameraDebug ?? true;
+    
+      this.parentScene = parentScene;
 
     this.modelUrl =
       options.modelUrl ?? '/models/woody/woody.glb';
@@ -38,6 +40,10 @@ export class WoodyScene {
      */
     this.bugOne = null;
     this.bugTwo = null;
+    this.bugOneCurve = null;
+    this.bugOneFlightDuration = 12; // 한 바퀴 도는 데 걸리는 시간 (초단위)
+    this.bugTwoCurve = null;
+    this.bugTwoFlightDuration = 10;
 
     /**
      * 카메라
@@ -81,12 +87,49 @@ export class WoodyScene {
     const gltf =
       await loader.loadAsync(this.modelUrl);
 
-    this.root = gltf.scene;
+    thisoot = gltf.scene;
+    
+    this.root.traverse((object) => {
+      if (!object.isMesh || !object.material) {
+        return;
+      }
+
+      // 이 mesh에 vertex color가 들어있는지 확인
+      const hasVertexColor =
+        !!object.geometry?.getAttribute('color');
+
+      if (!hasVertexColor) {
+        return;
+      }
+
+      console.log(
+        'Woody vertex color 제거:',
+        object.name,
+      );
+
+      if (Array.isArray(object.material)) {
+        object.material =
+          object.material.map((material) => {
+            const cloned = material.clone();
+
+            cloned.vertexColors = false;
+            cloned.needsUpdate = true;
+
+            return cloned;
+          });
+      } else {
+        object.material =
+          object.material.clone();
+
+        object.material.vertexColors = false;
+        object.material.needsUpdate = true;
+      }
+    });
 
     this.root.traverse((object) => {
       if (object.isMesh) {
-        object.castShadow = true;
-        object.receiveShadow = true;
+        object.castShadow = false;
+        object.receiveShadow = false;
       }
     });
 
@@ -158,92 +201,6 @@ this.root.traverse((object) => {
   });
 });
 
-const pinkMesh = this.root.getObjectByName('mesh_49');
-
-if (pinkMesh) {
-  console.log('===== PINK MESH =====');
-  console.log('mesh:', pinkMesh);
-  console.log('parent:', pinkMesh.parent?.name);
-  console.log('material:', pinkMesh.material);
-  console.log('color:', pinkMesh.material?.color?.getHexString());
-  console.log('map:', pinkMesh.material?.map);
-  console.log('metalness:', pinkMesh.material?.metalness);
-  console.log('roughness:', pinkMesh.material?.roughness);
-}
-
-const pinkPetals =
-  this.root.getObjectByName('mesh_49');
-
-if (pinkPetals?.isMesh) {
-  pinkPetals.material =
-    pinkPetals.material.clone();
-
-  const material =
-    pinkPetals.material;
-
-  // 텍스처 계열 제거
-  material.map = null;
-  material.emissiveMap = null;
-  material.aoMap = null;
-  material.metalnessMap = null;
-  material.roughnessMap = null;
-
-  // ★ 중요: glTF vertex color 비활성화
-  material.vertexColors = false;
-
-  // 핑크
-  material.color.set('#e89dce');
-
-  material.metalness = 0;
-  material.roughness = 0.45;
-
-  // 테스트용으로 아주 약하게 자체 발광
-  // 조명 때문에 검게 보이는 경우까지 배제
-  material.emissive.set('#e89dce');
-  material.emissiveIntensity = 0.15;
-
-  material.needsUpdate = true;
-
-  console.log(
-    'mesh_49 vertex colors:',
-    pinkPetals.geometry.getAttribute('color'),
-  );
-}
-
-const greenStem =
-  this.root.getObjectByName('mesh_51');
-
-if (greenStem?.isMesh) {
-  greenStem.material =
-    greenStem.material.clone();
-
-  const material =
-    greenStem.material;
-
-  // glTF/Redshift 변환 과정에서
-  // 검게 만드는 요소 제거
-  material.map = null;
-  material.emissiveMap = null;
-  material.aoMap = null;
-  material.metalnessMap = null;
-  material.roughnessMap = null;
-
-  // vertex color 영향 제거
-  material.vertexColors = false;
-
-  // 원래 GLB에 기록된 녹색
-  material.color.set('#8a9e28');
-
-  material.metalness = 0;
-  material.roughness = 0.55;
-
-  // 너무 검게 죽지 않도록 약한 자체 발광
-  material.emissive.set('#8a9e28');
-  material.emissiveIntensity = 0.08;
-
-  material.needsUpdate = true;
-}
-
     /**
      * 3. 디자이너 내장 애니메이션
      */
@@ -305,6 +262,13 @@ if (greenStem?.isMesh) {
     }
 
     /**
+     * 두 반딧불의 initial 값이 모두 만들어진 뒤
+     * 각각의 이동 경로 생성
+     */
+    this.createBugOnePath();
+    this.createBugTwoPath();
+
+    /**
      * 모델 전체 크기 기준으로
      * 반딧불 이동 거리 자동 계산
      */
@@ -337,27 +301,23 @@ if (greenStem?.isMesh) {
      * 5. EXR 배경
      */
     try {
-      const exrLoader =
-        new EXRLoader();
-
-      exrLoader.setDataType(
-        THREE.FloatType,
-      );
+      const textureLoader =
+        new THREE.TextureLoader();
 
       this.backgroundTexture =
-        await exrLoader.loadAsync(
+        await textureLoader.loadAsync(
           this.backgroundUrl,
         );
 
-      this.backgroundTexture.mapping =
-        THREE.EquirectangularReflectionMapping;
+      this.backgroundTexture.colorSpace =
+        THREE.SRGBColorSpace;
 
       console.log(
-        'Woody EXR 배경 로딩 완료',
+        'Woody PNG 배경 로딩 완료',
       );
     } catch (error) {
       console.error(
-        'Woody EXR 배경 로딩 실패:',
+        'Woody PNG 배경 로딩 실패:',
         error,
       );
     }
@@ -382,20 +342,18 @@ if (greenStem?.isMesh) {
    * Woody 장면 활성화
    */
   onActivate() {
-  if (!this.backgroundTexture) return;
+    if (!this.backgroundTexture) return;
 
-  this.parentScene.background =
-    this.backgroundTexture;
+    // 화면에 보이는 배경
+    this.parentScene.background =
+      this.backgroundTexture;
 
-  this.parentScene.environment =
-    this.backgroundTexture;
+    this.parentScene.backgroundIntensity = 1.0;
+    this.parentScene.backgroundBlurriness = 0;
 
-  // 배경 자체 밝기
-  this.parentScene.backgroundIntensity = 0.35;
-
-  // 모델에 EXR이 비추는 세기
-  this.parentScene.environmentIntensity = 0.25;
-}
+    // PNG는 환경광으로 사용하지 않음
+    this.parentScene.environment = null;
+  }
 
   /**
    * 다른 향으로 전환될 때
@@ -415,93 +373,136 @@ if (greenStem?.isMesh) {
   }
 
   applyCamera(targetCamera, controls) {
-  if (!this.sourceCamera) {
-    console.warn(
-      'Woody RS Camera를 찾지 못했습니다.',
+    if (!this.root) {
+      return false;
+    }
+
+    // 최종 고정 카메라 값
+    targetCamera.position.set(
+      0.010043473929623192,
+      0.0078395675224966,
+      0.07137422689394977,
     );
 
-    return false;
-  }
+    targetCamera.quaternion.set(
+      -0.00364156717482878,
+      0.03247058611709302,
+      0.00011830699051420253,
+      0.9994660504635362,
+    );
 
-  /**
-   * 중요:
-   * Fresh에서 사용하던 OrbitControls가
-   * Woody 카메라에 개입하지 못하도록
-   * 먼저 비활성화한다.
-   */
-  if (controls) {
-    controls.enabled = false;
-  }
-
-  /**
-   * GLB 내부 RS Camera의
-   * 정확한 world transform 계산
-   */
-  this.root.updateMatrixWorld(true);
-  this.sourceCamera.updateMatrixWorld(true);
-
-  const worldPosition =
-    new THREE.Vector3();
-
-  const worldQuaternion =
-    new THREE.Quaternion();
-
-  const worldScale =
-    new THREE.Vector3();
-
-  this.sourceCamera.matrixWorld.decompose(
-    worldPosition,
-    worldQuaternion,
-    worldScale,
-  );
-
-  /**
-   * 이전 Fresh 카메라 상태와 관계없이
-   * RS Camera 값으로 완전히 덮어쓴다.
-   */
-  targetCamera.position.copy(
-    worldPosition,
-  );
-
-  targetCamera.quaternion.copy(
-    worldQuaternion,
-  );
-
-  if (
-    this.sourceCamera.isPerspectiveCamera
-  ) {
-    targetCamera.fov =
-      this.sourceCamera.fov;
-
-    targetCamera.near =
-      Math.max(
-        this.sourceCamera.near,
-        0.01,
-      );
-
-    targetCamera.far =
-      Math.min(
-        this.sourceCamera.far,
-        1000,
-      );
-
+    targetCamera.fov = 35;
+    targetCamera.near = 0.005;
+    targetCamera.far = 1;
     targetCamera.zoom = 1;
 
     targetCamera.aspect =
-      window.innerWidth /
-      window.innerHeight;
+      window.innerWidth / window.innerHeight;
 
     targetCamera.updateProjectionMatrix();
+    targetCamera.updateMatrix();
+    targetCamera.updateMatrixWorld(true);
+
+    if (controls) {
+      controls.target.set(
+        0.004215122764930128,
+        0.007185220975660185,
+        -0.0182313434779644,
+      );
+
+      // 기본은 고정
+      controls.enabled =
+        this.enableCameraDebug;
+
+      controls.update();
+    }
+
+    // ===== 디버그용 함수들 유지 =====
+
+    window.getWoodyCamera = () => {
+      console.log(
+        '===== WOODY CAMERA =====',
+      );
+
+      console.log(
+        'position:',
+        targetCamera.position.x,
+        targetCamera.position.y,
+        targetCamera.position.z,
+      );
+
+      console.log(
+        'quaternion:',
+        targetCamera.quaternion.x,
+        targetCamera.quaternion.y,
+        targetCamera.quaternion.z,
+        targetCamera.quaternion.w,
+      );
+
+      console.log(
+        'fov:',
+        targetCamera.fov,
+      );
+
+      console.log(
+        'target:',
+        controls?.target.x,
+        controls?.target.y,
+        controls?.target.z,
+      );
+    };
+
+    window.panWoody = (
+      x = 0,
+      y = 0,
+      z = 0,
+    ) => {
+      const offset =
+        new THREE.Vector3(x, y, z);
+
+      targetCamera.position.add(offset);
+
+      if (controls) {
+        controls.target.add(offset);
+        controls.update();
+      }
+
+      targetCamera.updateMatrix();
+      targetCamera.updateMatrixWorld(true);
+
+      console.log(
+        'Woody pan:',
+        'position =',
+        targetCamera.position.toArray(),
+        'target =',
+        controls?.target.toArray(),
+      );
+    };
+
+    window.enableWoodyCameraDebug =
+      () => {
+        if (!controls) return;
+
+        controls.enabled = true;
+        console.log(
+          'Woody camera debug ON',
+        );
+      };
+
+    window.disableWoodyCameraDebug =
+      () => {
+        if (!controls) return;
+
+        controls.enabled = false;
+        console.log(
+          'Woody camera debug OFF',
+        );
+      };
+
+    return true;
   }
 
-  /**
-   * camera의 matrix도 즉시 갱신.
-   */
-  targetCamera.updateMatrix();
-  targetCamera.updateMatrixWorld(true);
-
-  return true;
-}
+  
 
   /**
    * 센서 신호 / 키보드 입력 시 호출
@@ -594,101 +595,321 @@ if (greenStem?.isMesh) {
     );
   }
 
+  createBugOnePath() {
+  if (!this.bugOneInitial) {
+    return;
+  }
+
+  const base =
+    this.bugOneInitial.position;
+
+  /**
+   * 현재 Woody 카메라가 상당히 확대되어 있어서
+   * motionScale을 사용하지 않고
+   * 실제 world 좌표 기준으로 아주 작게 이동시킨다.
+   */
+  this.bugOneCurve =
+    new THREE.CatmullRomCurve3(
+      [
+          // 1. 시작
+        new THREE.Vector3(
+          base.x,
+          base.y,
+          base.z,
+        ),
+
+        // 2. 왼쪽 + 살짝 위
+        new THREE.Vector3(
+          base.x - 0.010,
+          base.y + 0.002,
+          base.z + 0.002,
+        ),
+
+        // 3. 나무 앞쪽으로 접근
+        new THREE.Vector3(
+          base.x - 0.025,
+          base.y + 0.001,
+          base.z + 0.012,
+        ),
+
+        // 4. 나무 앞쪽 통과
+        new THREE.Vector3(
+          base.x - 0.035,
+          base.y + 0.0015,
+          base.z + 0.020,
+        ),
+
+        // 5. 나뭇잎 아래로 왼쪽 이동
+        new THREE.Vector3(
+          base.x - 0.047,
+          base.y + 0.002,
+          base.z + 0.015,
+        ),
+
+        // 6. 나무를 거의 벗어난 지점
+        new THREE.Vector3(
+          base.x - 0.052,
+          base.y + 0.003,
+          base.z + 0.007,
+        ),
+
+        // 7. 나무를 완전히 지난 뒤부터 위로 상승
+        new THREE.Vector3(
+          base.x - 0.055,
+          base.y + 0.006,
+          base.z - 0.004,
+        ),
+
+        // 8. 나무 뒤쪽
+        new THREE.Vector3(
+          base.x - 0.052,
+          base.y + 0.003,
+          base.z - 0.016,
+        ),
+
+        // 9. 가장 뒤쪽 + 살짝 아래
+        new THREE.Vector3(
+          base.x - 0.045,
+          base.y - 0.002,
+          base.z - 0.030,
+        ),
+
+        // 10. 뒤쪽에서 오른쪽으로 복귀
+        new THREE.Vector3(
+          base.x - 0.034,
+          base.y - 0.004,
+          base.z - 0.026,
+        ),
+
+        // 11. 천천히 앞으로
+        new THREE.Vector3(
+          base.x - 0.020,
+          base.y - 0.001,
+          base.z - 0.017,
+        ),
+
+        // 12. 중앙 근처까지 복귀
+        new THREE.Vector3(
+          base.x - 0.006,
+          base.y + 0.0035,
+          base.z - 0.010,
+        ),
+
+        // 13. 오른쪽으로 접근
+        new THREE.Vector3(
+          base.x + 0.001,
+          base.y + 0.004,
+          base.z - 0.007,
+        ),
+
+        // 14. 오른쪽 아래쪽 커브
+        new THREE.Vector3(
+          base.x + 0.005,
+          base.y + 0.0045,
+          base.z - 0.003,
+        ),
+
+        // 15. 오른쪽 끝
+        // 높이는 거의 올리지 않음
+        new THREE.Vector3(
+          base.x + 0.007,
+          base.y + 0.0045,
+          base.z + 0.001,
+        ),
+
+        // 16. 오른쪽 끝에서 앞쪽으로 둥글게 회전
+        new THREE.Vector3(
+          base.x + 0.0065,
+          base.y + 0.004,
+          base.z + 0.005,
+        ),
+
+        // 17. 왼쪽 방향으로 전환
+        new THREE.Vector3(
+          base.x + 0.004,
+          base.y + 0.003,
+          base.z + 0.007,
+        ),
+
+        // 18. 시작점으로 들어오기 직전
+        new THREE.Vector3(
+          base.x + 0.0015,
+          base.y + 0.0015,
+          base.z + 0.004,
+        ),
+      ],
+
+      true,
+
+      // overshoot가 비교적 적어서
+      // 장애물 사이 경로에 더 적합
+      'centripetal',
+    );
+}
+
+createBugTwoPath() {
+  if (!this.bugTwoInitial) {
+    return;
+  }
+
+  const base =
+    this.bugTwoInitial.position;
+
+  this.bugTwoCurve =
+    new THREE.CatmullRomCurve3(
+      [
+        // 1. 왼쪽 끝으로 접근
+        new THREE.Vector3(
+          base.x - 0.014,
+          base.y - 0.003,
+          base.z - 0.002,
+        ),
+
+        // 2. 왼쪽 끝 진입
+        new THREE.Vector3(
+          base.x - 0.018,
+          base.y - 0.0045,
+          base.z + 0.001,
+        ),
+
+        // 3. 왼쪽 아래쪽
+        new THREE.Vector3(
+          base.x - 0.020,
+          base.y - 0.005,
+          base.z + 0.004,
+        ),
+
+        // 4. 가장 왼쪽
+        // X 이동은 거의 멈추고 Z로 회전 시작
+        new THREE.Vector3(
+          base.x - 0.0205,
+          base.y - 0.0048,
+          base.z + 0.008,
+        ),
+
+        // 5. 가장 왼쪽 부근 유지
+        // X는 거의 그대로, Z만 계속 변화
+        new THREE.Vector3(
+          base.x - 0.020,
+          base.y - 0.004,
+          base.z + 0.012,
+        ),
+
+        // 6. 오른쪽으로 아주 천천히 방향 전환
+        new THREE.Vector3(
+          base.x - 0.018,
+          base.y - 0.003,
+          base.z + 0.015,
+        ),
+
+        // 7. 오른쪽 복귀 시작
+        new THREE.Vector3(
+          base.x - 0.014,
+          base.y - 0.0015,
+          base.z + 0.014,
+        ),
+
+        // 8. 오른쪽으로 자연스럽게 빠져나옴
+        new THREE.Vector3(
+          base.x - 0.008,
+          base.y,
+          base.z + 0.010,
+        ),
+
+        // 9. 본격적으로 가운데 방향으로 이동
+        new THREE.Vector3(
+          base.x - 0.001,
+          base.y + 0.001,
+          base.z + 0.005,
+        ),
+      ],
+
+      true,
+      'centripetal',
+    );
+
+  this.bugTwoCurve.arcLengthDivisions = 500;
+}
+
   updateBugOne(time) {
     if (
       !this.bugOne ||
-      !this.bugOneInitial
+      !this.bugOneCurve
     ) {
       return;
     }
 
-    const base =
-      this.bugOneInitial.position;
-
-    const radius =
-      this.motionScale;
+    /**
+     * 0 → 1 진행도
+     *
+     * 12초 동안 전체 경로 한 바퀴
+     */
+    const progress =
+      (time /
+        this.bugOneFlightDuration) %
+      1;
 
     /**
-     * 부드러운 불규칙 비행
+     * getPointAt을 사용하면
+     * 곡선 길이를 기준으로 움직여서
+     * 속도가 비교적 일정함
      */
-    const x =
-      Math.sin(time * 1.15) *
-      radius;
+    const position =
+      this.bugOneCurve.getPointAt(
+        progress,
+      );
 
-    const y =
-      Math.sin(
-        time * 1.9 + 0.8,
-      ) *
-      radius *
-      0.55;
-
-    const z =
-      Math.cos(
-        time * 0.85,
-      ) *
-      radius *
-      0.75;
-
-    this.bugOne.position.set(
-      base.x + x,
-      base.y + y,
-      base.z + z,
+    this.bugOne.position.copy(
+      position,
     );
 
     /**
-     * 살짝 흔들리는 느낌
+     * 아주 약간 떠다니는 느낌만 추가
+     *
+     * 기본 경로에는 영향을 거의 안 줌
      */
+    this.bugOne.position.y +=
+      Math.sin(time * 2.0) *
+      this.motionScale *
+      0.08;
+
     this.bugOne.rotation.z =
-      Math.sin(time * 2.5) *
-      0.12;
+      Math.sin(time * 1.8) *
+      0.08;
   }
 
   updateBugTwo(time) {
-    if (
-      !this.bugTwo ||
-      !this.bugTwoInitial
-    ) {
-      return;
-    }
+  if (
+    !this.bugTwo ||
+    !this.bugTwoCurve
+  ) {
+    return;
+  }
 
-    const base =
-      this.bugTwoInitial.position;
+  const progress =
+    (time /
+      this.bugTwoFlightDuration) %
+    1;
 
-    const radius =
-      this.motionScale *
-      0.9;
-
-    /**
-     * bug_one과 다른 궤적
-     */
-    const x =
-      Math.cos(
-        time * 0.95 + 1.7,
-      ) *
-      radius;
-
-    const y =
-      Math.sin(
-        time * 2.2 + 2.2,
-      ) *
-      radius *
-      0.65;
-
-    const z =
-      Math.sin(
-        time * 1.25 + 1.1,
-      ) *
-      radius *
-      0.8;
-
-    this.bugTwo.position.set(
-      base.x + x,
-      base.y + y,
-      base.z + z,
+  const position =
+    this.bugTwoCurve.getPointAt(
+      progress,
     );
 
-    this.bugTwo.rotation.z =
-      Math.cos(time * 2.2) *
-      0.1;
-  }
+  this.bugTwo.position.copy(
+    position,
+  );
+
+  /**
+   * 큰 움직임은 Curve가 담당하고,
+   * 아주 미세한 떠다니는 느낌만 추가
+   */
+  this.bugTwo.position.y +=
+    Math.sin(time * 1.6 + 1.2) *
+    0.00025;
+
+  this.bugTwo.rotation.z =
+    Math.sin(time * 1.7 + 0.8) *
+    0.07;
+}
 }
