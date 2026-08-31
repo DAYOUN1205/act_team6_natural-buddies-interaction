@@ -58,6 +58,17 @@ export class WoodyScene {
     this.characterMixer = null;
     this.characterAction = null;
 
+    // 캐릭터 앞 작은 반딧불
+    this.characterFirefly = null;
+    this.characterFireflyInitial = null;
+
+    // 반딧불 움직임 설정
+    this.characterFireflyRadiusX = 0.2;
+    this.characterFireflyRadiusY = 0.08;
+    this.characterFireflyRadiusZ = 0.04;
+
+    this.characterFireflySpeed = 1.4;
+
     this.characterStartPosition =
       new THREE.Vector3();
 
@@ -706,6 +717,10 @@ this.root.traverse((object) => {
     this.updateBugTwo(
       this.elapsedTime,
     );
+
+    this.updateCharacterFirefly(
+    this.elapsedTime,
+  );
   }
 
   async loadCharacter(loader) {
@@ -717,6 +732,33 @@ this.root.traverse((object) => {
 
       this.characterRoot =
         gltf.scene;
+
+        /**
+       * 캐릭터 앞 작은 반딧불
+       */
+      this.characterFirefly =
+        this.characterRoot.getObjectByName(
+          'Sphere',
+        );
+
+      if (this.characterFirefly) {
+        this.characterFireflyInitial =
+          this.characterFirefly.position.clone();
+
+        console.log(
+          'Woody character firefly:',
+          this.characterFirefly,
+        );
+
+        console.log(
+          'Firefly initial position:',
+          this.characterFireflyInitial.toArray(),
+        );
+      } else {
+        console.warn(
+          '캐릭터 반딧불 Sphere를 찾지 못했습니다.',
+        );
+      }
 
       /**
        * 캐릭터 전체를 움직이기 위한 Wrapper.
@@ -908,6 +950,44 @@ this.root.traverse((object) => {
       );
     }
   }
+
+  updateCharacterFirefly(time) {
+    if (
+      !this.characterFirefly ||
+      !this.characterFireflyInitial
+    ) {
+      return;
+    }
+
+    const base =
+      this.characterFireflyInitial;
+
+    const t =
+      time *
+      this.characterFireflySpeed;
+
+    /**
+     * 완전한 원이 아니라
+     * 살짝 불규칙한 3D 타원 궤도.
+     *
+     * 캐릭터 앞에서 멀리 벗어나지 않고
+     * 작은 반딧불처럼 둥글게 떠다님.
+     */
+    this.characterFirefly.position.x =
+      base.x +
+      Math.cos(t) *
+        this.characterFireflyRadiusX;
+
+    this.characterFirefly.position.y =
+      base.y +
+      Math.sin(t) *
+        this.characterFireflyRadiusY;
+
+    this.characterFirefly.position.z =
+      base.z +
+      Math.sin(t * 0.65) *
+        this.characterFireflyRadiusZ;
+    }
 
   createBugOnePath() {
     if (!this.bugOneInitial) {
