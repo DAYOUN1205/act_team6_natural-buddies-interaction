@@ -29,7 +29,7 @@ async function main() {
    * FLORAL
    */
   const floralScene = new FloralScene(app.scene, {
-    modelUrl: '/models/floral/0830_flower.glb',
+    modelUrl: '/models/floral/floral_0901.glb',
     backgroundUrl: '/models/floral/floral_background_final.png',
     onStatus: setStatus,
   });
