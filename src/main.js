@@ -13,13 +13,9 @@ import { connectKeyboardInput } from './input/keyboardInput.js';
 import {  connectSerialInput, } from './input/serialInput.js';
 
 const canvas = document.querySelector('#scene');
-const statusElement = document.querySelector('#status');
 
 function setStatus(message) {
-  if (!statusElement) return;
-
-  statusElement.style.display = 'block';
-  statusElement.textContent = message;
+  console.log(message);
 }
 
 async function main() {
