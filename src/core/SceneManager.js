@@ -159,10 +159,6 @@ export class SceneManager {
     const activeScene =
       this.scenes.get(this.activeSceneName);
 
-    activeScene?.update(deltaTime);
-  }
-
-  getScene(name) {
-    return this.scenes.get(name);
+    activeScene?.update?.(deltaTime);
   }
 }
