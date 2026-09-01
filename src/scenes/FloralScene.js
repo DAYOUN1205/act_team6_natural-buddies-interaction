@@ -3,9 +3,6 @@ import * as THREE from 'three';
 import { GLTFLoader } from
   'three/addons/loaders/GLTFLoader.js';
 
-import { EXRLoader } from
-  'three/addons/loaders/EXRLoader.js';
-
 import { RectAreaLightUniformsLib } from
   'three/addons/lights/RectAreaLightUniformsLib.js';
 
@@ -37,7 +34,6 @@ export class FloralScene {
 
     this.root = null;
 
-    this.sourceCamera = null;
     this.backgroundTexture = null;
 
     this.flower1 = {
@@ -85,9 +81,6 @@ export class FloralScene {
     this.closedAngle =
       THREE.MathUtils.degToRad(68);
 
-    this.closedAngle =
-      THREE.MathUtils.degToRad(68);
-
     // Floral 전용 조명
     this.floralLightGroup = new THREE.Group();
 
@@ -125,19 +118,6 @@ export class FloralScene {
 
     this.setupLights();
 
-    /**
-     * 디자이너가 넣어둔 카메라
-     */
-    this.sourceCamera =
-      this.root.getObjectByName('RS Camera') ??
-      this.root.getObjectByName('RS_Camera');
-
-    if (!this.sourceCamera) {
-      console.warn(
-        'RS Camera를 찾지 못했습니다.',
-      );
-    }
-
     this.findFlowers();
 
     // flower1 = 오른쪽 꽃 → 시계방향
@@ -152,7 +132,6 @@ export class FloralScene {
       'counterclockwise',
     );
 
-    this.inspectMainFlowers();
     this.prepareFlowers(); 
     /**
      * 캐릭터 로드
@@ -479,34 +458,6 @@ export class FloralScene {
   this.floralLightGroup.visible = false;
 }
 
-  smoothMainFlowerGeometry() {
-  const meshes = [
-    ...this.flower1.petals,
-    ...this.flower1.center,
-    ...this.flower2.petals,
-    ...this.flower2.center,
-  ];
-
-  meshes.forEach((mesh) => {
-    if (!mesh.isMesh || !mesh.geometry) {
-      return;
-    }
-
-    let geometry = mesh.geometry.clone();
-
-    geometry.deleteAttribute('uv');
-
-    geometry = mergeVertices(
-      geometry,
-      1e-4,
-    );
-
-    geometry.normalizeNormals();
-
-    mesh.geometry = geometry;
-  });
-}
-
   /**
    * flower1 / flower2 찾기
    *
@@ -615,144 +566,6 @@ export class FloralScene {
     return angleA - angleB;
   });
 }
-
-  inspectMainFlowers() {
-  const meshes = [
-    ...this.flower1.petals,
-    ...this.flower1.center,
-    ...this.flower2.petals,
-    ...this.flower2.center,
-  ];
-
-  const checkedMaterials = new Set();
-
-  meshes.forEach((mesh) => {
-    console.log(
-      'MESH',
-      mesh.name,
-      'vertices:',
-      mesh.geometry?.attributes?.position?.count,
-      'triangles:',
-      mesh.geometry?.index
-        ? mesh.geometry.index.count / 3
-        : mesh.geometry?.attributes?.position?.count / 3,
-    );
-
-    const materials = Array.isArray(mesh.material)
-      ? mesh.material
-      : [mesh.material];
-
-    materials.forEach((material) => {
-      if (!material || checkedMaterials.has(material.uuid)) {
-        return;
-      }
-
-      checkedMaterials.add(material.uuid);
-
-      console.log('MATERIAL', material.name, {
-        type: material.type,
-
-        color:
-          material.color?.getHexString(),
-
-        metalness:
-          material.metalness,
-
-        roughness:
-          material.roughness,
-
-        map:
-          !!material.map,
-
-        normalMap:
-          !!material.normalMap,
-
-        roughnessMap:
-          !!material.roughnessMap,
-
-        metalnessMap:
-          !!material.metalnessMap,
-
-        aoMap:
-          !!material.aoMap,
-
-        alphaMap:
-          !!material.alphaMap,
-
-        bumpMap:
-          !!material.bumpMap,
-
-        displacementMap:
-          !!material.displacementMap,
-      });
-    });
-  });
-}
-
-  applyFlowerColors() {
-  /**
-   * 흑백으로 export된 yarn 텍스처 위에
-   * Three.js에서 색을 곱해준다.
-   *
-   * texture 자체의 실/섬유 질감은 그대로 유지됨.
-   */
-
-  const petalColor = new THREE.Color('#e1b83f');
-  const centerColor = new THREE.Color('#c94d4d');
-
-  const tintMeshes = (meshes, color) => {
-    meshes.forEach((mesh) => {
-      /**
-       * 같은 material을 다른 오브젝트와 공유할 수 있으므로
-       * 반드시 clone해서 이 꽃만 수정한다.
-       */
-      if (Array.isArray(mesh.material)) {
-        mesh.material = mesh.material.map((material) => {
-          const cloned = material.clone();
-
-          cloned.color.copy(color);
-
-          cloned.needsUpdate = true;
-
-          return cloned;
-        });
-      } else if (mesh.material) {
-        mesh.material = mesh.material.clone();
-
-        mesh.material.color.copy(color);
-
-        mesh.material.needsUpdate = true;
-      }
-    });
-  };
-
-  /**
-   * 꽃잎 = 금색/노란색
-   */
-  tintMeshes(
-    this.flower1.petals,
-    petalColor,
-  );
-
-  tintMeshes(
-    this.flower2.petals,
-    petalColor,
-  );
-
-  /**
-   * 중앙부 = 붉은색
-   */
-  tintMeshes(
-    this.flower1.center,
-    centerColor,
-  );
-
-  tintMeshes(
-    this.flower2.center,
-    centerColor,
-  );
-}
-
   /**
    * 꽃잎과 중앙부 구분
    */
@@ -951,6 +764,12 @@ onActivate() {
   // Floral 전용 조명 켜기
   if (this.floralLightGroup) {
     this.floralLightGroup.visible = true;
+  }
+}
+
+onDeactivate() {
+  if (this.floralLightGroup) {
+    this.floralLightGroup.visible = false;
   }
 }
 
@@ -1237,99 +1056,4 @@ onActivate() {
         )
     );
   }
-  applyClayMaterials() {
-  const targetMaterials = new Set([
-    'Material.013', // 꽃잎
-    'Material.019', // 꽃잎
-    'Material.010', // 중앙
-    'Material.023', // 중앙
-  ]);
-
-  this.root.traverse((object) => {
-    if (!object.isMesh || !object.material) {
-      return;
-    }
-
-    const materials =
-      Array.isArray(object.material)
-        ? object.material
-        : [object.material];
-
-    const converted =
-      materials.map((material) => {
-        if (!targetMaterials.has(material.name)) {
-          return material;
-        }
-
-        const clay =
-          new THREE.MeshPhysicalMaterial({
-            name: `${material.name}_Clay`,
-
-            // GLB의 원래 색 그대로
-            color: material.color.clone(),
-
-            // 꽃/클레이는 비금속
-            metalness: 0,
-
-            /**
-             * 너무 높이면 분필처럼 되고
-             * 너무 낮으면 플라스틱처럼 됨.
-             *
-             * 레퍼런스는 satin clay 쪽.
-             */
-            roughness: 0.55,
-
-            /**
-             * 부드러운 흰색 highlight
-             */
-            specularIntensity: 0.45,
-            specularColor: new THREE.Color(
-              0xffffff,
-            ),
-
-            ior: 1.45,
-
-            /**
-             * 클레이에는 코팅층이 필요 없음.
-             * 오히려 clearcoat가 들어가면
-             * 플라스틱/도자기 느낌이 강해짐.
-             */
-            clearcoat: 0,
-
-            /**
-             * sheen은 원래 천/섬유 표현용 성격이
-             * 강하므로 일단 사용하지 않음.
-             */
-            sheen: 0,
-
-            envMapIntensity: 0.5,
-
-            side: material.side,
-
-            transparent:
-              material.transparent,
-
-            opacity:
-              material.opacity,
-
-            depthWrite:
-              material.depthWrite,
-
-            depthTest:
-              material.depthTest,
-          });
-
-        clay.flatShading = false;
-
-        clay.needsUpdate = true;
-
-        return clay;
-      });
-
-    object.material =
-      Array.isArray(object.material)
-        ? converted
-        : converted[0];
-  });
-}
 }

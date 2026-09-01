@@ -20,8 +20,6 @@ export function connectKeyboardInput(sceneManager) {
     console.log(
       `${event.key} → ${sceneName.toUpperCase()}`,
     );
-
-    sceneManager.trigger(sceneName);
   }
 
   window.addEventListener(
