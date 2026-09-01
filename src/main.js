@@ -2,6 +2,7 @@ import './style.css';
 
 import { ThreeApp } from './core/ThreeApp.js';
 import { SceneManager } from './core/SceneManager.js';
+import { AudioManager } from './audio/AudioManager.js';
 
 import { FreshScene } from './scenes/FreshScene.js';
 import { FloralScene } from './scenes/FloralScene.js';
@@ -22,9 +23,23 @@ function setStatus(message) {
 }
 
 async function main() {
-  const app = new ThreeApp(canvas);
+  const app =
+    new ThreeApp(canvas);
 
-  const sceneManager = new SceneManager(app);
+  const audioManager =
+    new AudioManager();
+
+  const sceneManager =
+    new SceneManager(
+      app,
+      {
+        onTrigger: (sceneName) => {
+          audioManager.playScent(
+            sceneName,
+          );
+        },
+      },
+    );
 
   /**
    * FLORAL
@@ -111,7 +126,7 @@ async function main() {
     '#connect-sensor',
   );
 
-connectSensorButton
+  connectSensorButton
   ?.addEventListener(
     'click',
     async () => {
@@ -137,7 +152,7 @@ connectSensorButton
       }
     },
   );
-
+  
   /**
    * 렌더 루프
    */
