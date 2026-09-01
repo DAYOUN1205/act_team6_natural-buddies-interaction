@@ -30,12 +30,6 @@ export class WoodyScene {
     this.root = null;
 
     /**
-     * 디자이너가 만들어둔 그룹
-     */
-    this.stationary = null;
-    this.animationGroup = null;
-
-    /**
      * 반딧불
      */
     this.bugOne = null;
@@ -88,11 +82,6 @@ export class WoodyScene {
         0,
         0.015,
       );
-
-    /**
-     * 카메라
-     */
-    this.sourceCamera = null;
 
     /**
      * glTF 내장 애니메이션
@@ -222,28 +211,6 @@ export class WoodyScene {
       'RS Camera:',
       this.sourceCamera,
     );
-
-    console.log(
-  '===== WOODY MATERIALS =====',
-);
-
-this.root.traverse((object) => {
-  if (!object.isMesh) return;
-
-  const materials =
-    Array.isArray(object.material)
-      ? object.material
-      : [object.material];
-
-  materials.forEach((material) => {
-    console.log({
-      mesh: object.name,
-      material: material?.name,
-      color:
-        material?.color?.getHexString?.(),
-    });
-  });
-});
 
     /**
      * 3. 디자이너 내장 애니메이션
