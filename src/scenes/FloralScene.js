@@ -107,6 +107,56 @@ export class FloralScene {
 
     this.root = gltf.scene;
 
+    this.root.position.set(
+  0,
+  -0.15,
+  0,
+);
+
+this.root.scale.setScalar(
+  1.2,
+);
+
+    window.getFloralModel = () => {
+  console.log(
+    'position:',
+    this.root.position.toArray(),
+  );
+
+  console.log(
+    'scale:',
+    this.root.scale.x,
+  );
+};
+
+window.moveFloralModel = (
+  x = 0,
+  y = 0,
+  z = 0,
+) => {
+  this.root.position.x += x;
+  this.root.position.y += y;
+  this.root.position.z += z;
+
+  console.log(
+    'Floral model position:',
+    this.root.position.toArray(),
+  );
+};
+
+window.scaleFloralModel = (
+  scale,
+) => {
+  this.root.scale.setScalar(
+    scale,
+  );
+
+  console.log(
+    'Floral model scale:',
+    scale,
+  );
+};
+
     this.root.traverse((object) => {
       if (object.isMesh) {
         object.castShadow = false;
@@ -198,7 +248,7 @@ export class FloralScene {
       );
 
       this.characterWrapper.scale.setScalar(
-        0.12,
+        0.08,
       );
 
       /**
