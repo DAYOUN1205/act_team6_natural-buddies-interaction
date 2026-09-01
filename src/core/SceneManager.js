@@ -1,12 +1,19 @@
 // 어떤 향 장면을 보여줄지 관리함.
 
 export class SceneManager {
-  constructor(app) {
-  this.app = app;
+  constructor(
+  app,
+    {
+      onTrigger = () => {},
+    } = {},
+  ) {
+    this.app = app;
 
-  this.scenes = new Map();
-  this.activeSceneName = null;
-}
+    this.scenes = new Map();
+    this.activeSceneName = null;
+
+    this.onTrigger = onTrigger;
+  }
 
   async add(name, scentScene) {
     await scentScene.load();
@@ -137,10 +144,13 @@ export class SceneManager {
     );
   }
 
+  this.onTrigger(name);
+
   /**
    * 닫힌 상태로 초기화 +
    * 애니메이션 시작
    */
+  
   targetScene.trigger();
 
   /**
