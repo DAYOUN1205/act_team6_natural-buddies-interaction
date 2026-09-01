@@ -25,6 +25,7 @@ export class ThreeApp {
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
+      powerPreference: 'high-performance',
     });
 
     this.renderer.setPixelRatio(
@@ -41,7 +42,7 @@ export class ThreeApp {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.5;
 
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = false;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.controls = new OrbitControls(
@@ -75,7 +76,6 @@ export class ThreeApp {
     );
 
     directionalLight.position.set(4, 6, 5);
-    directionalLight.castShadow = true;
 
     this.scene.add(directionalLight);
   }
