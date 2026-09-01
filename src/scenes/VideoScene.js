@@ -8,8 +8,6 @@ export class VideoScene {
       options.onStatus ?? (() => {});
 
     this.video = null;
-
-    this.isActive = false;
   }
 
 
@@ -109,12 +107,6 @@ export class VideoScene {
     }
   }
 
-
-  onActivate() {
-    this.isActive = true;
-  }
-
-
   onDeactivate() {
     this.isActive = false;
 
@@ -172,10 +164,5 @@ export class VideoScene {
    */
   applyCamera() {
     return true;
-  }
-
-
-  update() {
-    // 필요 없음
   }
 }
