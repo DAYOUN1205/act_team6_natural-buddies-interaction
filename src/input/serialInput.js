@@ -1,8 +1,8 @@
 const DEFAULT_CHANNEL_MAP = {
-  A: 'fresh',
-  B: 'floral',
-  C: 'woody',
-  D: 'amber',
+  A: 'amber',
+  B: 'woody',
+  C: 'fresh',
+  D: 'floral',
 };
 
 export async function connectSerialInput(
