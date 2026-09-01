@@ -25,7 +25,7 @@ export class AudioManager {
       floral: {
         audio:
           new Audio('/audio/floral_sound.mp3'),
-        maxDuration: null,
+        maxDuration: 3,
         volume: 1,
       },
     };

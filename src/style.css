@@ -49,3 +49,7 @@ body {
 
   cursor: pointer;
 }
+
+#status {
+  display: none !important;
+}
